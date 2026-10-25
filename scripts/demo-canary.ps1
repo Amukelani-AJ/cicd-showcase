@@ -1,5 +1,6 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Demo: ship a good release and a bad one through the canary and watch the automatic rollback
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Layer the bad release on the stable one and wait for a healthy rollout at the end (the first run left a canary half-finished)
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Only show AnalysisRuns created after a scenario starts, so the previous result is not shown as the current one
 <#
 .SYNOPSIS
   Drive the canary release on the local kind cluster and narrate what Argo Rollouts decides.
@@ -39,10 +40,21 @@ function Get-RolloutJson {
     if ($LASTEXITCODE -eq 0 -and $json) { return ($json | Out-String | ConvertFrom-Json) }
 }
 
-function Get-LatestAnalysis {
+# AnalysisRuns that existed before a scenario started belong to earlier rollouts. Hiding them stops the
+# previous scenario's result from showing up as if it were the current one. (Names, not timestamps: the
+# Docker VM clock can differ from the host's by minutes.)
+$script:OldAnalyses = @()
+
+function Get-AnalysisItems {
     $json = kubectl --context $Context -n showcase get analysisrun -o json 2>$null | Out-String
-    if (-not $json) { return $null }
-    $items = ($json | ConvertFrom-Json).items
+    if (-not $json) { return @() }
+    return @(($json | ConvertFrom-Json).items)
+}
+
+function Start-Scenario { $script:OldAnalyses = @(Get-AnalysisItems | ForEach-Object { $_.metadata.name }) }
+
+function Get-LatestAnalysis {
+    $items = @(Get-AnalysisItems | Where-Object { $script:OldAnalyses -notcontains $_.metadata.name })
     if (-not $items) { return $null }
     return ($items | Sort-Object { $_.metadata.creationTimestamp } | Select-Object -Last 1)
 }
@@ -107,6 +119,7 @@ $results = @()
 $stable = @() # the parameters that make up the stable release, so a bad release is always layered on top of it
 
 if ($Scenario -in 'both', 'good') {
+    Start-Scenario
     $stamp = Get-Date -Format 'HHmmss'
     $stable = @(@{ name = 'env.RELEASE_NOTE'; value = "good-$stamp" })
     Set-ReleaseParams $stable
@@ -115,6 +128,7 @@ if ($Scenario -in 'both', 'good') {
 }
 
 if ($Scenario -in 'both', 'bad') {
+    Start-Scenario
     Set-ReleaseParams ($stable + @(@{ name = 'env.FAIL_RATE'; value = '0.6'; forceString = $true }))
     $phase = Watch-Rollout "BAD release (FAIL_RATE=0.6): the canary should be rolled back"
     $results += [pscustomobject]@{ Release = 'bad'; Expected = 'Degraded'; Outcome = $phase; OkShare = "$(Get-OkShare)%" }
@@ -123,6 +137,7 @@ if ($Scenario -in 'both', 'bad') {
 }
 
 # Put the Application back to its Git-defined state. After a good release that is one more (passing) canary.
+Start-Scenario
 Set-ReleaseParams $null
 $restored = Wait-Healthy "Restoring the Git-defined release"
 

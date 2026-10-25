@@ -19,7 +19,7 @@ Owner is away and asked me to keep working unattended: commit often, merge my ow
 2. P6 observability (`/metrics`, Prometheus, Grafana), P7 canary rollback (Argo Rollouts), P8 DORA, P9 polish.
 
 ## Gotchas
-- Venv lives at `%LOCALAPPDATA%\venvs\cicd` (the folder is under OneDrive).
+- Venv lives at `%LOCALAPPDATA%envs\cicd` (the folder is under OneDrive).
 - `gh` has two accounts logged in. Run `gh auth switch --user Amukelani-AJ` first. Commits use the repo-local identity `Amukelani-AJ <125798384+Amukelani-AJ@users.noreply.github.com>`; the global git config is the work identity.
 - New shells need the PATH refreshed to find kind and Helm: `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`.
 - Windows PowerShell 5.1: native stderr becomes an error under `$ErrorActionPreference='Stop'`; use exit codes. `Invoke-RestMethod` to localhost failed here, `curl.exe` works.
