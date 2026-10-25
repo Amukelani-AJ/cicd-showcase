@@ -1,0 +1,12 @@
+{{- /* Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Post-install hints */ -}}
+cicd-showcase {{ .Values.image.tag }} deployed as release "{{ .Release.Name }}".
+
+{{- if eq .Values.service.type "NodePort" }}
+
+On the kind cluster from k8s/kind-config.yaml the service is on:
+  http://localhost:8080/health
+  http://localhost:8080/version
+{{- else }}
+
+Reach it with:  kubectl port-forward svc/{{ include "cicd-showcase.fullname" . }} 8080:{{ .Values.service.port }}
+{{- end }}

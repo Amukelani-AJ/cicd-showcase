@@ -1,0 +1,45 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Default values for the cicd-showcase chart
+replicaCount: 2
+
+image:
+  repository: ghcr.io/amukelani-aj/cicd-showcase
+  # GitOps (P5) overwrites this with the immutable sha-<short> tag on every release.
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: 8000
+  nodePort: 30080 # must match k8s/kind-config.yaml
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+
+# Pod runs as the same non-root uid the Dockerfile creates.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+probes:
+  path: /health
+  liveness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    initialDelaySeconds: 2
+    periodSeconds: 5

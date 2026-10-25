@@ -1,0 +1,7 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Helm chart for the FastAPI service
+apiVersion: v2
+name: cicd-showcase
+description: FastAPI demo service used to exercise the CI/CD pipeline
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
