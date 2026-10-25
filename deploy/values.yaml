@@ -2,4 +2,4 @@
 # Only the image tag lives here. publish.yml rewrites it (one commit by github-actions[bot]) after
 # each image is pushed, signed and verified. Argo CD then syncs the cluster to it. See D-012.
 image:
-  tag: sha-a3c87af
+  tag: sha-f22f668
