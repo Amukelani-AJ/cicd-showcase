@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Solo-developer adaptation of the multi-engineer compliance validator
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Reformatted with ruff to satisfy the project's lint gate
 """Project compliance and repository hygiene validator (solo developer).
 
 Enforces:
@@ -56,7 +57,9 @@ def check_branch(errors: list[str]) -> None:
         return
     print(f"[*] Checking active branch: {branch}")
     if branch in PROTECTED_BRANCHES:
-        errors.append(f"Direct commits to '{branch}' are prohibited. Create a branch, e.g. feature/<slug>.")
+        errors.append(
+            f"Direct commits to '{branch}' are prohibited. Create a branch, e.g. feature/<slug>."
+        )
     elif not branch.startswith(VALID_PREFIXES):
         errors.append(
             f"Branch '{branch}' does not match the naming convention "
@@ -99,9 +102,15 @@ def check_worklog(base: str | None, strict: bool, errors: list[str]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--strict", action="store_true", help="fail (not warn) when WORKLOG.md is not updated")
-    parser.add_argument("--base", help="compare against this ref (e.g. origin/main) instead of staged changes")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--strict", action="store_true", help="fail (not warn) when WORKLOG.md is not updated"
+    )
+    parser.add_argument(
+        "--base", help="compare against this ref (e.g. origin/main) instead of staged changes"
+    )
     args = parser.parse_args()
 
     print("=" * 60)
