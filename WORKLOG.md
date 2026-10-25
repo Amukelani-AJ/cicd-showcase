@@ -5,3 +5,5 @@ Append-only. One row per commit. Never edit or delete earlier rows.
 | Date | AI Assistant | Branch | Description |
 |------|--------------|--------|-------------|
 | 2026-10-25 | Claude Sonnet 5.5 | main | Bootstrap: CLAUDE.md, plan, decision log, architecture and API docs, compliance script, gitignore |
+| 2026-10-25 | Claude Sonnet 5.5 | feature/P1-walking-skeleton | Added FastAPI service (/, /health, /version), 5 tests at 100% coverage, multi-stage non-root Dockerfile, local CI compose harness, ci.yml, README; verified lint, tests and container smoke test locally |
+| 2026-10-25 | Claude Sonnet 5.5 | feature/P1-walking-skeleton | Published public repo Amukelani-AJ/cicd-showcase, opened PR #1, first GitHub CI run green; updated handoff and plan |

@@ -1,0 +1,23 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Local CI harness mirroring .github/workflows/ci.yml
+#
+#   docker compose -f docker-compose.ci.yml --profile python run --rm ci-python
+#   docker compose -f docker-compose.ci.yml down -v
+#
+# Keep these commands identical to the python job in ci.yml so local and remote CI agree.
+
+services:
+  ci-python:
+    profiles: ["python"]
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+    command: >
+      sh -c "
+        pip install --no-cache-dir -r requirements-dev.txt &&
+        ruff check . &&
+        ruff format --check . &&
+        pytest -v -p no:cacheprovider
+      "

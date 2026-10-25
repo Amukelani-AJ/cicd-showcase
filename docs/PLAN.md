@@ -32,7 +32,7 @@ Status key: ⬜ Not started · 🚀 In Progress · ✅ Done
 | 0.3 | `.gitignore`, `.gitattributes`, `.env.example`, compliance script | |
 
 ## P1: Walking skeleton: service, tests, container, CI
-**Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25
+**Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25. Code complete; verified locally and green on GitHub CI (PR #1). Done when the owner merges it.
 **Depends On**: P0
 **Complexity**: Medium
 Delivered together because each piece is meaningless without the others: a service nobody tests, a container nobody builds, or CI with nothing to run.
