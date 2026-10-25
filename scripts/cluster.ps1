@@ -4,6 +4,7 @@
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Probe with curl.exe instead of Invoke-RestMethod
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Quote the resource list so PowerShell does not split it on commas
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added the gitops action: install Argo CD v3.5.6 and apply the Application
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — gitops: wait on workloads, not pods; add -Revision to track a branch
 <#
 .SYNOPSIS
   Manage the local kind cluster for this project.
@@ -91,8 +92,11 @@ switch ($Action) {
         # Server-side apply: the ApplicationSet CRD is too large for client-side apply.
         kubectl --context $Context apply --server-side --force-conflicts -n argocd -f $ArgoInstallUrl
         if ($LASTEXITCODE -ne 0) { throw 'Argo CD install failed' }
-        kubectl --context $Context wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s
-        if ($LASTEXITCODE -ne 0) { throw 'Argo CD pods did not become ready' }
+        # Wait on the workloads, not on pods: pods do not exist yet right after the apply.
+        kubectl --context $Context wait --for=condition=Available deployment --all -n argocd --timeout=300s
+        if ($LASTEXITCODE -ne 0) { throw 'Argo CD deployments did not become available' }
+        kubectl --context $Context rollout status statefulset/argocd-application-controller -n argocd --timeout=300s
+        if ($LASTEXITCODE -ne 0) { throw 'Argo CD application controller did not become ready' }
 
         $manifest = Get-Content "$Root/argocd/application.yaml" -Raw
         if ($Revision) { $manifest = $manifest -replace 'targetRevision: main', "targetRevision: $Revision" }
