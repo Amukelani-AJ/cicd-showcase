@@ -7,7 +7,7 @@ Status key: ⬜ Not started · 🚀 In Progress · ✅ Done
 | Phase | Name | Status |
 |---|---|---|
 | P0 | Governance bootstrap | ✅ Done 2026-10-25 |
-| P1 | Walking skeleton: service, tests, container, CI | 🚀 In Progress |
+| P1 | Walking skeleton: service, tests, container, CI | ✅ Done 2026-10-25 |
 | P2 | Publish to GHCR | ⬜ |
 | P3 | Security gates and supply chain | ⬜ |
 | P4 | Local Kubernetes with kind and Helm | ⬜ |
@@ -32,7 +32,7 @@ Status key: ⬜ Not started · 🚀 In Progress · ✅ Done
 | 0.3 | `.gitignore`, `.gitattributes`, `.env.example`, compliance script | |
 
 ## P1: Walking skeleton: service, tests, container, CI
-**Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25. Code complete; verified locally and green on GitHub CI (PR #1). Done when the owner merges it.
+**Status**: ✅ Done 2026-10-25 — Claude Sonnet 5.5. Merged via PR #1 with green CI.
 **Depends On**: P0
 **Complexity**: Medium
 Delivered together because each piece is meaningless without the others: a service nobody tests, a container nobody builds, or CI with nothing to run.
