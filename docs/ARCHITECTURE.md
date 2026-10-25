@@ -1,6 +1,6 @@
 # Architecture
 
-Status: target design. Sections are marked by the phase that delivers them; P1 to P6 exist today.
+Status: target design. Sections are marked by the phase that delivers them; P1 to P7 exist today.
 
 ## Overview
 
@@ -15,7 +15,7 @@ Status: target design. Sections are marked by the phase that delivers them; P1 t
                                        ▼
                     Argo CD ──watches Git──▶ kind cluster ◀── Helm chart           (P4, P5)
                                        │
-                         Argo Rollouts canary 10% → 50% → 100%                     (P7)
+                         Argo Rollouts canary 20% → 60% → 100%                     (P7)
                                        │ queries
                                    Prometheus ◀── /metrics from the service        (P6)
                                        │ error rate too high → rollback
@@ -34,7 +34,7 @@ Status: target design. Sections are marked by the phase that delivers them; P1 t
 | `k8s/kind-config.yaml` + `charts/cicd-showcase` | Single-node kind cluster (service on `127.0.0.1:8088`) and the hardened Helm chart | P4 |
 | `argocd/application.yaml` + `deploy/values.yaml` | Argo CD Application (automated sync, prune, self-heal) and the image tag it deploys, written by the `promote` job | P5 |
 | `argocd/platform/prometheus-stack.yaml`, `/metrics`, ServiceMonitor, dashboard | Prometheus and Grafana installed by Argo CD; the service exposes request count and latency; a dashboard ships as a ConfigMap | P6 |
-| Argo Rollouts | Canary releases with metric-driven rollback | P7 |
+| Argo Rollouts (`argocd/platform/argo-rollouts.yaml`), chart `rollout.yaml`, `analysistemplate.yaml`, `loadgen.yaml` | Canary 20% → 60% → 100% judged by Prometheus on the canary's own pods; aborts and rolls back automatically | P7 |
 
 ## Layer boundaries (service)
 

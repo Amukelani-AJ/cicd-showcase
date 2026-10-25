@@ -6,6 +6,7 @@
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added the gitops action: install Argo CD v3.5.6 and apply the Application
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — gitops: wait on workloads, not pods; add -Revision to track a branch
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — gitops: install the Prometheus stack first (-NoPlatform to skip)
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — gitops: also install Argo Rollouts before the app
 <#
 .SYNOPSIS
   Manage the local kind cluster for this project.
@@ -15,7 +16,7 @@
   ./scripts/cluster.ps1 up -Local          # build the local Dockerfile and load it into the cluster
   ./scripts/cluster.ps1 gitops             # cluster + Argo CD; Argo CD deploys the chart from Git (replaces `up`)
   ./scripts/cluster.ps1 gitops -Revision my-branch   # track a branch or commit instead of main
-  ./scripts/cluster.ps1 gitops -NoPlatform           # skip Prometheus and Grafana
+  ./scripts/cluster.ps1 gitops -NoPlatform           # skip Prometheus, Grafana and Argo Rollouts
   ./scripts/cluster.ps1 status
   ./scripts/cluster.ps1 down
 .NOTES
@@ -112,11 +113,14 @@ switch ($Action) {
         kubectl --context $Context rollout status statefulset/argocd-application-controller -n argocd --timeout=300s
         if ($LASTEXITCODE -ne 0) { throw 'Argo CD application controller did not become ready' }
 
-        # The platform goes first: the showcase chart only renders its ServiceMonitor once the CRDs exist.
+        # The platform goes first: the showcase chart only renders its ServiceMonitor, Rollout and
+        # AnalysisTemplate once their CRDs exist. Prometheus first, then Argo Rollouts.
         if (-not $NoPlatform) {
-            kubectl --context $Context apply -f "$Root/argocd/platform/prometheus-stack.yaml"
-            if ($LASTEXITCODE -ne 0) { throw 'Applying the Prometheus stack Application failed' }
-            Wait-ArgoApp 'prometheus-stack' 900
+            foreach ($app in @('prometheus-stack', 'argo-rollouts')) {
+                kubectl --context $Context apply -f "$Root/argocd/platform/$app.yaml"
+                if ($LASTEXITCODE -ne 0) { throw "Applying the $app Application failed" }
+                Wait-ArgoApp $app 900
+            }
         }
 
         $manifest = Get-Content "$Root/argocd/application.yaml" -Raw

@@ -12,8 +12,8 @@ Status key: ⬜ Not started · 🚀 In Progress · ✅ Done
 | P3 | Security gates and supply chain | ✅ Done 2026-10-25 |
 | P4 | Local Kubernetes with kind and Helm | ✅ Done 2026-10-25 |
 | P5 | GitOps with Argo CD | ✅ Done 2026-10-25 |
-| P6 | Observability: Prometheus and Grafana | 🚀 In Progress |
-| P7 | Progressive delivery: canary with auto rollback | ⬜ |
+| P6 | Observability: Prometheus and Grafana | ✅ Done 2026-10-25 |
+| P7 | Progressive delivery: canary with auto rollback | ✅ Done 2026-10-25 |
 | P8 | DORA metrics dashboard | ⬜ |
 | P9 | Docs and demo polish | ⬜ |
 
@@ -71,13 +71,13 @@ Needs `kind` and `helm` installed (done via winget, kind v0.33.0 and Helm v4.3.1
 CI commits the new image tag to the manifests; Argo CD syncs with self-heal.
 
 ## P6: Observability
-**Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25
+**Status**: ✅ Done 2026-10-25 — Claude Sonnet 5.5. PR #7 green; verified with the published image: Prometheus scrapes both pods, Grafana loaded the dashboard and answered a panel query.
 **Depends On**: P4
 **Complexity**: Medium
 `/metrics` endpoint, Prometheus, Grafana dashboard.
 
 ## P7: Progressive delivery
-**Status**: ⬜ Not started
+**Status**: ✅ Done 2026-10-25 — Claude Sonnet 5.5. Proven on the local cluster: good release promoted, bad release (FAIL_RATE=0.6) aborted on a measured 0.4 to 0.57 success rate. See docs/CANARY_DEMO.md. The canary path is not covered by CI (needs Prometheus and Rollouts).
 **Depends On**: P5, P6
 **Complexity**: High
 Argo Rollouts canary with a Prometheus AnalysisTemplate; a deliberately broken release must roll itself back.

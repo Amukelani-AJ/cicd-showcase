@@ -1,0 +1,42 @@
+{{- /* Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Argo Rollout: canary with Prometheus analysis and automatic rollback */ -}}
+{{- if include "cicd-showcase.useRollout" . }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "cicd-showcase.fullname" . }}
+  labels:
+    {{- include "cicd-showcase.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.rollout.replicas }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "cicd-showcase.selectorLabels" . | nindent 6 }}
+  template:
+    {{- include "cicd-showcase.podTemplate" . | nindent 4 }}
+  strategy:
+    canary:
+      # No traffic router: the weight is the share of pods, and the Service spreads requests over all of them.
+      steps:
+        - setWeight: {{ .Values.rollout.firstWeight }}
+        - pause:
+            duration: {{ .Values.rollout.pause }}
+        - analysis:
+            templates:
+              - templateName: {{ include "cicd-showcase.fullname" . }}-success-rate
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Latest
+        - setWeight: {{ .Values.rollout.secondWeight }}
+        - pause:
+            duration: {{ .Values.rollout.pause }}
+        - analysis:
+            templates:
+              - templateName: {{ include "cicd-showcase.fullname" . }}-success-rate
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Latest
+        - setWeight: 100
+{{- end }}
