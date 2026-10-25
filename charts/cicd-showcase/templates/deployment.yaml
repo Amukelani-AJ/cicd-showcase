@@ -1,4 +1,5 @@
 {{- /* Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Deployment for the service (becomes an Argo Rollout in P7) */ -}}
+{{- /* Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Render optional env vars from values */ -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,6 +25,13 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.service.targetPort }}
+          {{- with .Values.env }}
+          env:
+            {{- range $name, $value := . }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           livenessProbe:

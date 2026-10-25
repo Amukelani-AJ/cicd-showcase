@@ -1,0 +1,17 @@
+{{- /* Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Prometheus Operator ServiceMonitor, only when the CRD exists */ -}}
+{{- if and .Values.metrics.serviceMonitor.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1") }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "cicd-showcase.fullname" . }}
+  labels:
+    {{- include "cicd-showcase.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "cicd-showcase.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+{{- end }}

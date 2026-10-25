@@ -1,4 +1,5 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Default values for the cicd-showcase chart
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added env, metrics.serviceMonitor and dashboard values
 replicaCount: 2
 
 image:
@@ -43,3 +44,17 @@ probes:
   readiness:
     initialDelaySeconds: 2
     periodSeconds: 5
+
+# Extra environment variables for the container, e.g. FAIL_RATE: "0.5" (demo failure injection, see API_DESIGN.md).
+env: {}
+
+metrics:
+  serviceMonitor:
+    # Renders only when enabled AND the cluster has the Prometheus Operator CRDs,
+    # so the chart still installs on a bare cluster (CI) without them.
+    enabled: false
+    interval: 15s
+
+dashboard:
+  # A ConfigMap labelled grafana_dashboard=1 that the kube-prometheus-stack Grafana sidecar loads.
+  enabled: false
