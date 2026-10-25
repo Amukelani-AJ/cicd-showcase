@@ -10,9 +10,9 @@ Built in stages; see [docs/PLAN.md](docs/PLAN.md) for the full roadmap.
 
 | Stage | What | State |
 |---|---|---|
-| P1 | Service, tests, container, CI | Built, verified locally |
-| P2 | Publish to GHCR | Planned |
-| P3 | Security gates, SBOM, image signing | Planned |
+| P1 | Service, tests, container, CI | Done |
+| P2 | Publish to GHCR | Done |
+| P3 | Security gates, SBOM, image signing | In progress |
 | P4–P5 | kind, Helm, Argo CD GitOps | Planned |
 | P6–P7 | Prometheus, canary with auto rollback | Planned |
 | P8 | DORA metrics dashboard | Planned |
@@ -32,6 +32,32 @@ The same checks GitHub runs (lint, format, tests with an 80% coverage gate), in 
 ```powershell
 docker compose -f docker-compose.ci.yml --profile python run --rm ci-python
 ```
+
+## Verify a published image
+
+Images are published to GHCR on every merge to `main`, signed keyless with cosign, and shipped with a CycloneDX SBOM attestation and build provenance.
+
+```powershell
+docker pull ghcr.io/amukelani-aj/cicd-showcase:latest
+
+cosign verify ghcr.io/amukelani-aj/cicd-showcase:latest `
+  --certificate-identity-regexp '^https://github.com/Amukelani-AJ/cicd-showcase/\.github/workflows/publish\.yml@refs/(heads/main|tags/v.*)$' `
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+gh attestation verify oci://ghcr.io/amukelani-aj/cicd-showcase:latest --repo Amukelani-AJ/cicd-showcase
+```
+
+## Security gates
+
+| Gate | Tool | Runs |
+|---|---|---|
+| Secrets in code and history | Gitleaks | PRs, `main`, weekly |
+| Static analysis | Semgrep (pinned) | PRs, `main`, weekly |
+| Dependencies, Dockerfile, workflow config | Trivy (fs) | PRs, `main`, weekly |
+| Built image vulnerabilities | Trivy (image) | every PR |
+| SBOM | Syft, CycloneDX | every PR and release |
+
+All GitHub Actions are pinned to commit SHAs and updated by Dependabot. See D-007 to D-009 in [docs/DECISIONS.md](docs/DECISIONS.md) for the reasoning.
 
 ## API
 

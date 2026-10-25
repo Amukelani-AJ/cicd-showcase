@@ -43,3 +43,24 @@ Append-only. Superseded decisions stay; add a new entry that supersedes them.
 **Decision**: publish on push to `main` (tags `sha-<short>` and `latest`) and on `v*` tags (semver tags). PRs only build and smoke-test, never push.
 **Trade-offs**: no per-PR images; preview environments would need a separate decision.
 **Status**: Accepted
+
+## D-007: Vulnerability scanner and action-pinning policy (2026-10-25)
+**Options**: Trivy · Grype (Anchore) · Docker Scout
+**Constraints**: free; scans dependencies, container images and Dockerfile/workflow config; usable in GitHub Actions and locally; trustworthy supply chain. Trivy had a critical advisory on 2026-03-21 ("Trivy ecosystem supply chain temporarily compromised"), and `trivy-action` a medium one on 2026-02-18.
+**Decision**: Trivy, using `aquasecurity/trivy-action` v0.36.0 (released 2026-04-22, after the incident), pinned by full commit SHA. Every other action is also SHA-pinned, and Dependabot proposes updates.
+**Trade-offs**: a compromised upstream tag can no longer change what runs, but SHA pins go stale without Dependabot. Revisit and switch to Grype (pairs with Syft) if another incident hits Trivy.
+**Status**: Accepted
+
+## D-008: Image signing and attestations (2026-10-25)
+**Options**: cosign keyless (OIDC) · cosign with a stored key · GitHub artifact attestations only · Notation
+**Constraints**: free; no long-lived signing key to store or leak; verifiable by anyone; works with GHCR
+**Decision**: cosign keyless for the image signature and a CycloneDX SBOM attestation, plus a GitHub build provenance attestation (`actions/attest-build-provenance`). The publish workflow verifies its own signature and SBOM attestation after signing.
+**Trade-offs**: signing identities are recorded in the public Sigstore transparency log, which is fine for a public repo. No SLSA level is claimed: that needs checking against the SLSA spec.
+**Status**: Accepted
+
+## D-009: SAST tool (2026-10-25)
+**Options**: Semgrep OSS · CodeQL · Bandit
+**Constraints**: free; covers Python plus Dockerfile and GitHub Actions rules; pinned version; no repo-settings changes needed
+**Decision**: Semgrep OSS pinned to 1.182.1 with `p/python`, `p/dockerfile` and `p/github-actions` rule packs.
+**Trade-offs**: shallower dataflow analysis than CodeQL. CodeQL's default setup could be added later, but that is a repo setting that needs the owner.
+**Status**: Accepted
