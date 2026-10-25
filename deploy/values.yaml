@@ -5,7 +5,7 @@
 # github-actions[bot]) after each image is pushed, signed and verified; Argo CD then syncs the
 # cluster to it. Everything else here is edited by hand through PRs. See D-012.
 image:
-  tag: sha-b83b61a
+  tag: sha-056aa1e
 
 # Observability (P6). Both are no-ops on a cluster without the Prometheus Operator CRDs / Grafana.
 metrics:
