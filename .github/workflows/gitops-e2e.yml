@@ -1,5 +1,6 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — End-to-end GitOps test: Argo CD on kind deploys the chart from Git, then self-heals drift
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pre-pull Argo CD images with retries after redis hit ImagePullBackOff on the runner; describe pods on failure
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Fall back to mirror.gcr.io and docker.io for the redis image: public.ecr.aws throttles GitHub runners
 name: GitOps e2e
 
 on:
@@ -37,16 +38,34 @@ jobs:
           config: k8s/kind-config.yaml
 
       - name: Download the Argo CD manifest and pre-pull its images
-        # A throttled public registry (redis comes from public.ecr.aws) otherwise leaves a pod in
-        # ImagePullBackOff for minutes. Pull with retries here, then side-load into the cluster.
+        # public.ecr.aws answers GitHub runners with "toomanyrequests: Data limit exceeded", and a pod's
+        # own retries cannot get past a persistent limit. Pull here instead, falling back to mirrors of
+        # the same official Docker image, re-tag to the name the manifest expects, and side-load into kind.
         run: |
           curl -fsS "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml" -o install.yaml
-          for img in $(grep -E '^[[:space:]]+image:' install.yaml | sed -E 's/^[[:space:]]+image:[[:space:]]*//' | sort -u); do
-            for attempt in 1 2 3 4 5; do
-              docker pull "$img" && break
-              [ "$attempt" -eq 5 ] && { echo "could not pull $img"; exit 1; }
-              echo "pull of $img failed (attempt $attempt), retrying"; sleep $((attempt * 10))
+
+          pull_with_fallback() {
+            local img="$1" rest cand attempt
+            local candidates=("$img")
+            case "$img" in
+              public.ecr.aws/docker/library/*)
+                rest="${img#public.ecr.aws/docker/library/}"
+                candidates+=("mirror.gcr.io/library/${rest}" "docker.io/library/${rest}") ;;
+            esac
+            for cand in "${candidates[@]}"; do
+              for attempt in 1 2; do
+                if docker pull "$cand"; then
+                  [ "$cand" != "$img" ] && docker tag "$cand" "$img"
+                  return 0
+                fi
+                echo "pull of ${cand} failed (attempt ${attempt})"; sleep 5
+              done
             done
+            return 1
+          }
+
+          for img in $(grep -E '^[[:space:]]+image:' install.yaml | sed -E 's/^[[:space:]]+image:[[:space:]]*//' | sort -u); do
+            pull_with_fallback "$img" || { echo "could not pull $img from any source"; exit 1; }
             kind load docker-image "$img" --name cicd
           done
 
