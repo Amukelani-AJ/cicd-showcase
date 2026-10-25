@@ -4,9 +4,9 @@ cicd-showcase {{ .Values.image.tag }} deployed as release "{{ .Release.Name }}".
 {{- if eq .Values.service.type "NodePort" }}
 
 On the kind cluster from k8s/kind-config.yaml the service is on:
-  http://localhost:8080/health
-  http://localhost:8080/version
+  http://localhost:8088/health
+  http://localhost:8088/version
 {{- else }}
 
-Reach it with:  kubectl port-forward svc/{{ include "cicd-showcase.fullname" . }} 8080:{{ .Values.service.port }}
+Reach it with:  kubectl port-forward svc/{{ include "cicd-showcase.fullname" . }} 8088:{{ .Values.service.port }}
 {{- end }}
