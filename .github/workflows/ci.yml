@@ -1,5 +1,7 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — CI: compliance, lint, tests, image build (no push yet)
-# TODO(P3): pin each `uses:` to a full commit SHA (run `pinact run`).
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pinned every action to a commit SHA (bumped to current majors); Dependabot keeps them fresh
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added Trivy image scan and CycloneDX SBOM to the image job
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pass github.base_ref via env to fix a Semgrep shell-injection finding
 name: CI
 
 on:
@@ -19,15 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the compliance script diffs against origin/main
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Compliance checks (PR)
         if: github.event_name == 'pull_request'
-        run: python scripts/validate-compliance.py --strict --base origin/${{ github.base_ref }}
+        env:
+          BASE_REF: ${{ github.base_ref }} # via env, never interpolated into the script
+        run: python scripts/validate-compliance.py --strict --base "origin/${BASE_REF}"
       - name: Compliance checks (push)
         if: github.event_name == 'push'
         run: python scripts/validate-compliance.py
@@ -36,8 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
           cache: pip
@@ -52,10 +56,10 @@ jobs:
     timeout-minutes: 15
     needs: python
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build image (no push)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: false
@@ -75,3 +79,17 @@ jobs:
           done
           docker logs smoke
           exit 1
+      - name: Trivy image scan (fails on fixable HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: cicd-showcase:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: cicd-showcase:ci
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+          artifact-name: sbom-ci.cdx.json
