@@ -9,7 +9,7 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=app --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=app --cov=dora --cov-report=term-missing --cov-fail-under=80"
 
 [tool.coverage.run]
 branch = true
