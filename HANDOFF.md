@@ -1,36 +1,36 @@
 # Handoff — updated 2026-10-25 (Claude Sonnet 5.5)
-**Branch**: feature/P8-dora-metrics   **Phase**: P0–P7 done; P8 in PR
+**Branch**: feature/P9-polish   **Phase**: all of P0 to P9 done; this PR is the last one
 
 ## Standing instruction
-Owner is away and asked me to keep working unattended: commit often, merge my own PRs once every CI check is green, work through `docs/PLAN.md`. See `CLAUDE.md` for the rules and the "Still needs the owner" list.
+The owner was away and asked me to keep working unattended: commit often, merge my own PRs once every CI check is green, work through `docs/PLAN.md`. That plan is now complete. See `CLAUDE.md` for the rules and the "Still needs the owner" list.
 
 ## Done
-- P0–P7 merged (PRs #1 to #8). The whole loop works unattended: merge, publish (signed, SBOM, provenance), bot commit of the new tag to `deploy/values.yaml`, Argo CD sync, a canary judged by Prometheus, promotion or automatic rollback. Verified again after the P7 merge: the Git-driven canary promoted `sha-b83b61a` to 5/5 pods.
-- P8 (this PR): `dora/` package (five DORA metrics from Publish runs and PRs, stdlib only), 54 tests, `.github/workflows/dora.yml`, `docs/DORA.md`, D-016. Run against the real repo; HTML dashboard rendered and checked.
+- P0 to P9. Public repo `Amukelani-AJ/cicd-showcase`. PRs #1 to #9 merged with green CI, this one is #10. The README is the front page; `docs/RUNBOOK.md` has every command; `docs/LESSONS.md` is the honest account of what broke.
+- The loop works unattended and was verified more than once: merge, publish (signed, SBOM, provenance), bot commit of the new tag to `deploy/values.yaml`, Argo CD sync, Prometheus-judged canary, promotion or automatic rollback, DORA report.
 
-## Needs the owner
-- **GitHub Pages for the DORA dashboard.** Enable Settings > Pages > Source: GitHub Actions, then set the repository variable `ENABLE_PAGES` to `true`. Until then the report is available as the `dora-report` artifact and in each run's summary, and the Pages job is skipped. I did not change repo settings.
-- **This PC's clock is about 3m45s ahead of GitHub's** (last successful time sync 2026-10-23 from `Server.MBA.local`). Commit timestamps in this repo are therefore a few minutes in the future, lead times are understated by up to that, and the Docker VM clock looked "behind" because of it. I did not touch the system clock.
+## Needs the owner (nothing blocks the project; these are your decisions)
+1. **GitHub Pages for the DORA dashboard.** Enable Settings > Pages > Source: GitHub Actions, then set the repository variable `ENABLE_PAGES` to `true`. Until then the report is the `dora-report` artifact and the run summary, and the Pages job is skipped.
+2. **A LICENSE file.** The repo is public and has none. Choosing a license is yours, so I did not add one.
+3. **Branch protection on `main`** with the CI checks as required. If you enable it, allow `github-actions[bot]` to bypass, or the `promote` job (D-012) will fail to push the tag. See `docs/LESSONS.md` for the alternative.
+4. **This PC's clock is about 3m45s ahead of GitHub's** (last successful sync 2026-10-23 from `Server.MBA.local`). It skews commit timestamps and understates DORA lead time. I did not touch the system clock.
+5. **Which GitHub account.** Everything lives under `Amukelani-AJ` (personal). The work account `Amukelani-MB` was never used. `gh` still has both logged in.
 
 ## State of the local machine
-- kind cluster `cicd` (context `kind-cicd`) running Argo CD v3.5.6, prometheus-stack, argo-rollouts and the `showcase` Application tracking `main`. Service on http://localhost:8088. Port 8080 belongs to an unrelated process (do not kill it).
-- The Docker Desktop VM can freeze for minutes while the PC idles; that once rolled back a healthy canary (fixed: no data is now inconclusive and pauses the rollout).
-- A Semgrep venv exists at `%LOCALAPPDATA%\venvs\semgrep` (pinned 1.182.1); run the CI scan locally with `semgrep scan --error --metrics off --config p/python --config p/dockerfile --config p/github-actions app dora Dockerfile .github`.
+- kind cluster `cicd` (context `kind-cicd`) is running Argo CD v3.5.6, prometheus-stack, argo-rollouts and the `showcase` Application tracking `main`. Service on http://localhost:8088. `./scripts/cluster.ps1 down` deletes it. It uses a fair amount of memory; delete it if you do not need it.
+- Port 8080 belongs to an unrelated process (I did not touch it), hence 8088.
+- Venvs outside OneDrive: `%LOCALAPPDATA%\venvs\cicd` (project) and `%LOCALAPPDATA%\venvs\semgrep` (pinned Semgrep).
+- kind v0.33.0 and Helm v4.3.1 were installed with winget.
 
-## Next steps (ordered)
-1. Confirm the P8 PR merged and the first `DORA metrics` run succeeded (check the run summary).
-2. P9: README polish, an architecture diagram, "what I'd do differently" (candidates: feed canary rollbacks back to GitHub so DORA's instability metrics stop being proxies; canary path in CI; branch protection; a real cloud target).
-3. Optional: cover the canary path in CI (needs Prometheus and Rollouts on the runner; mind registry throttling, see D-013).
+## If you want to keep going
+See "What I would do differently" in `docs/LESSONS.md`. Highest value first: enforce signatures at admission, feed canary rollbacks back to GitHub so the DORA instability metrics stop being proxies, and cover the canary path in CI.
 
 ## Gotchas
-- Venv lives at `%LOCALAPPDATA%\venvs\cicd` (the folder is under OneDrive).
 - `gh` has two accounts logged in. Run `gh auth switch --user Amukelani-AJ` first. Commits use the repo-local identity `Amukelani-AJ <125798384+Amukelani-AJ@users.noreply.github.com>`; the global git config is the work identity.
 - New shells need PATH refreshed to find kind and Helm: `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`.
-- Windows PowerShell 5.1: native stderr becomes an error under `$ErrorActionPreference='Stop'`; use exit codes. `Invoke-RestMethod` to localhost failed here, `curl.exe` works. `scripts/*.ps1` are CRLF (see `.gitattributes`); edit them with line endings normalised.
+- Windows PowerShell 5.1: native stderr becomes an error under `$ErrorActionPreference='Stop'`; use exit codes. `Invoke-RestMethod` to localhost failed here, `curl.exe` works. `scripts/*.ps1` are CRLF (see `.gitattributes`); edit them with line endings preserved.
 - The Argo CD manifest sets `imagePullPolicy: Always`, and `public.ecr.aws` throttles GitHub runners: the GitOps e2e job pre-pulls images, falls back to mirrors and patches the policy (D-013).
-- The `promote` bot is the only writer allowed to commit directly to `main` (D-012). If branch protection is ever enabled it must be allowed to bypass.
+- The `promote` bot is the only writer allowed to commit directly to `main` (D-012).
 - Grafana's admin password is chart-generated (secret `prometheus-stack-grafana`).
 - Semgrep already caught one real finding (shell injection in a workflow). Fix findings, never weaken the gate.
 - Very large combined shell commands with several heredocs sometimes fail to parse in this environment; write files with the Write tool or a script file instead.
-- The shipping helper (`ship.sh`) is in the session scratchpad, not the repo. Manual flow: push, `gh pr create`, `gh pr checks <n> --watch`, `gh pr merge <n> --squash --delete-branch`.
-- Branch protection is not enabled (changing repo settings needs the owner).
+- The shipping helper (`ship.sh`) was in the session scratchpad, not the repo. Manual flow: push, `gh pr create`, `gh pr checks <n> --watch`, `gh pr merge <n> --squash --delete-branch`.

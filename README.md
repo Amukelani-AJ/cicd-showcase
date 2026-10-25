@@ -1,143 +1,97 @@
 # CI/CD Showcase
 
-A small FastAPI service wrapped in a complete, free, local-first delivery pipeline: tests, container image, security gates, GitOps deployment on a local Kubernetes cluster, canary releases with automatic rollback, and DORA metrics.
+[![CI](https://github.com/Amukelani-AJ/cicd-showcase/actions/workflows/ci.yml/badge.svg)](https://github.com/Amukelani-AJ/cicd-showcase/actions/workflows/ci.yml)
+[![Security](https://github.com/Amukelani-AJ/cicd-showcase/actions/workflows/security.yml/badge.svg)](https://github.com/Amukelani-AJ/cicd-showcase/actions/workflows/security.yml)
+[![Publish](https://github.com/Amukelani-AJ/cicd-showcase/actions/workflows/publish.yml/badge.svg)](https://github.com/Amukelani-AJ/cicd-showcase/actions/workflows/publish.yml)
+[![GitOps e2e](https://github.com/Amukelani-AJ/cicd-showcase/actions/workflows/gitops-e2e.yml/badge.svg)](https://github.com/Amukelani-AJ/cicd-showcase/actions/workflows/gitops-e2e.yml)
 
-The app is deliberately tiny. The pipeline is the project.
+A tiny FastAPI service with a complete delivery pipeline built around it: automated tests and security gates, signed container images, GitOps deployment on Kubernetes, canary releases that roll themselves back, and DORA metrics. It runs entirely for free, on one laptop.
 
-## Status
+The app is deliberately small. The pipeline is the project, and so are the incidents along the way, which are written up in [docs/LESSONS.md](docs/LESSONS.md).
 
-Built in stages; see [docs/PLAN.md](docs/PLAN.md) for the full roadmap.
+## What this demonstrates
 
-| Stage | What | State |
+| Capability | What is built | Look at |
 |---|---|---|
-| P1 | Service, tests, container, CI | Done |
-| P2 | Publish to GHCR | Done |
-| P3 | Security gates, SBOM, image signing | Done |
-| P4 | kind and Helm | Done |
-| P5 | Argo CD GitOps | Done |
-| P6 | Prometheus and Grafana | Done |
-| P7 | Canary with automatic rollback | Done |
-| P8 | DORA metrics dashboard | In progress |
+| Automated quality gates | ruff, pytest with an 80% gate (99% actual), a repo hygiene check, all on every PR | [ci.yml](.github/workflows/ci.yml) |
+| Container hygiene | Multi-stage, non-root, health-checked image; smoke-tested before and after publishing | [Dockerfile](Dockerfile) |
+| Supply-chain security | Gitleaks, Semgrep, Trivy (files and image), CycloneDX SBOM, keyless cosign signing, build provenance attestation, every Action pinned to a commit SHA and kept fresh by Dependabot | [security.yml](.github/workflows/security.yml), [publish.yml](.github/workflows/publish.yml) |
+| Kubernetes packaging | A hardened Helm chart (read-only root filesystem, dropped capabilities, limits) proved on a fresh kind cluster in CI | [charts/](charts/cicd-showcase), [ci.yml](.github/workflows/ci.yml) |
+| GitOps | Argo CD deploys whatever Git says; CI never holds cluster credentials; manual drift is reverted | [argocd/](argocd), [deploy/values.yaml](deploy/values.yaml), [gitops-e2e.yml](.github/workflows/gitops-e2e.yml) |
+| Observability | Prometheus metrics from the app, a ServiceMonitor, a Grafana dashboard, all installed by Argo CD | [dashboard](charts/cicd-showcase/files/dashboard.json) |
+| Progressive delivery | Argo Rollouts canary judged by Prometheus on the canary pods only; a bad release aborts itself | [CANARY_DEMO.md](docs/CANARY_DEMO.md) |
+| Delivery metrics | The five current DORA metrics from the GitHub API, with the proxies called out honestly | [DORA.md](docs/DORA.md), [dora/](dora) |
+| Engineering discipline | 16 logged decisions with options and trade-offs, an append-only worklog, attribution headers | [DECISIONS.md](docs/DECISIONS.md), [WORKLOG.md](WORKLOG.md) |
 
-## Run it
+## How a change reaches the cluster
 
-```powershell
-docker build -t cicd-showcase:dev --build-arg APP_VERSION=0.1.0 --build-arg GIT_SHA=local .
-docker run --rm -p 8000:8000 cicd-showcase:dev
-# http://localhost:8000/docs for the OpenAPI UI
+```mermaid
+flowchart LR
+    dev([Developer]) -->|opens PR| ci["CI on the PR<br/>lint, tests, Semgrep, Gitleaks, Trivy<br/>kind and GitOps end-to-end"]
+    ci -->|all green, merge| main[(main)]
+    main --> pub["Publish<br/>build, smoke test, cosign signature,<br/>SBOM, provenance"]
+    pub --> ghcr[(GHCR image)]
+    pub -->|bot commits the new tag| vals["deploy/values.yaml"]
+    vals -.->|watched by| argo[Argo CD]
+    subgraph cluster [Local kind cluster]
+        argo --> roll["Argo Rollouts<br/>canary 20%, 60%, 100%"]
+        roll --> app[FastAPI pods]
+        prom[Prometheus] -->|scrapes /metrics| app
+        roll -->|is the canary healthy?| prom
+        graf[Grafana] --> prom
+    end
+    ghcr -.->|image pulled| roll
+    main -.->|Actions API| dora["DORA report"]
 ```
 
-## Run the CI locally
+## Proof, with numbers
 
-The same checks GitHub runs (lint, format, tests with an 80% coverage gate), in Docker:
+- **A bad release rolls itself back.** A release with `FAIL_RATE=0.6` measured a success rate of 0.4 to 0.57 on the canary pod, was aborted within about 45 seconds, and users kept getting 100% good responses. A good release was promoted in about three minutes with every measurement at 100%. Transcripts: [docs/CANARY_DEMO.md](docs/CANARY_DEMO.md).
+- **The whole loop runs unattended.** Merge, publish, signed image, bot commit of the new tag, Argo CD sync, canary analysis, promotion. After the last feature PR merged, the cluster promoted the new image to 5 of 5 pods with no manual step.
+- **The image is verifiable by anyone.** `gh attestation verify` and `cosign verify` pass from outside CI (commands in the [runbook](docs/RUNBOOK.md)).
+- **Failures are documented, not hidden.** A frozen VM caused a false rollback, a registry throttled CI, my own workflow had a shell-injection pattern that Semgrep caught, and my clock turned out to be almost four minutes fast. What happened and what changed: [docs/LESSONS.md](docs/LESSONS.md).
+
+## Try it
+
+Needs Docker. The cluster parts also need [kind](https://kind.sigs.k8s.io/) and [Helm](https://helm.sh/) (`winget install Kubernetes.kind Helm.Helm`). The scripts are PowerShell, written and tested on Windows.
 
 ```powershell
+# the service
+docker build -t cicd-showcase:dev .
+docker run --rm -p 8000:8000 cicd-showcase:dev        # http://localhost:8000/docs
+
+# the same CI checks GitHub runs, in Docker
 docker compose -f docker-compose.ci.yml --profile python run --rm ci-python
+
+# the full platform: kind, Argo CD, Prometheus, Grafana, Argo Rollouts, and the app
+./scripts/cluster.ps1 gitops                          # http://localhost:8088/version
+
+# watch a good release get promoted and a bad one get rolled back
+./scripts/demo-canary.ps1
+
+# the DORA report for this repo
+python -m dora --repo Amukelani-AJ/cicd-showcase      # build/dora/index.html
 ```
 
-## Run it on local Kubernetes
+Everything else (UIs, credentials, verification commands, troubleshooting) is in the [runbook](docs/RUNBOOK.md).
 
-Needs Docker, [kind](https://kind.sigs.k8s.io/) and [Helm](https://helm.sh/) (`winget install Kubernetes.kind Helm.Helm`).
+## Documentation
 
-```powershell
-./scripts/cluster.ps1 up            # kind cluster + chart, using the published GHCR image
-./scripts/cluster.ps1 up -Local     # same, but builds and loads your local Dockerfile
-./scripts/cluster.ps1 status
-./scripts/cluster.ps1 down
-# http://localhost:8088/version
-```
-
-The script only ever talks to the `kind-cicd` context. CI runs the same flow on a fresh kind cluster for every PR. The chart runs as non-root with a read-only root filesystem, dropped capabilities and resource limits; see [D-010](docs/DECISIONS.md) for why there is no ingress controller.
-
-## GitOps with Argo CD
-
-```powershell
-./scripts/cluster.ps1 gitops        # kind cluster + Argo CD v3.5.6 + the showcase Application
-```
-
-Git is the source of truth for what runs. Merging to `main` publishes an image; a CI job then commits the new `sha-<short>` tag to [deploy/values.yaml](deploy/values.yaml), and Argo CD syncs the cluster to it. CI never holds cluster credentials. Manual changes to the cluster are reverted by self-heal (try `kubectl -n showcase scale deploy/showcase-cicd-showcase --replicas=5`). A `GitOps e2e` workflow proves the whole loop on a fresh cluster for every PR that touches the chart or Argo CD config. See [D-012](docs/DECISIONS.md).
-
-```powershell
-# Argo CD UI at https://localhost:8089 (user: admin)
-kubectl --context kind-cicd -n argocd port-forward svc/argocd-server 8089:443
-kubectl --context kind-cicd -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  # base64-decode it
-```
-
-## Observability
-
-`./scripts/cluster.ps1 gitops` also installs Prometheus and Grafana (kube-prometheus-stack, via Argo CD). The service exposes `http_requests_total` and `http_request_duration_seconds` on `/metrics`; its ServiceMonitor and a **CI/CD Showcase** Grafana dashboard ship with the chart. Skip all of it with `-NoPlatform`.
-
-```powershell
-kubectl --context kind-cicd -n monitoring port-forward svc/prometheus-stack-grafana 3000:80      # http://localhost:3000, user: admin
-kubectl --context kind-cicd -n monitoring get secret prometheus-stack-grafana -o jsonpath="{.data.admin-password}"   # base64-decode it
-kubectl --context kind-cicd -n monitoring port-forward svc/prometheus-stack-kube-prom-prometheus 9090   # http://localhost:9090
-```
-
-Grafana's admin password is generated by the chart into a secret, and Grafana is reachable only through `port-forward`. Setting `FAIL_RATE` (0 to 1) on the service makes `GET /` fail on purpose; the canary release in P7 uses it to prove an automatic rollback. See [D-014](docs/DECISIONS.md).
-
-## Canary releases with automatic rollback
-
-The service is deployed as an [Argo Rollout](https://argoproj.github.io/rollouts/): 20% of the pods, an analysis, 60%, another analysis, then 100%. Each analysis asks Prometheus for the success rate of the *canary pods only* and aborts the rollout if it drops below 95%. Users keep being served by the stable revision.
-
-```powershell
-./scripts/demo-canary.ps1                  # a good release, then a bad one (FAIL_RATE=0.6), about 12 minutes
-./scripts/demo-canary.ps1 -Scenario bad    # just the rollback, about 2 minutes
-kubectl --context kind-cicd -n argo-rollouts port-forward svc/argo-rollouts-dashboard 3100   # http://localhost:3100
-```
-
-A good release was promoted in about three minutes with every measurement at 100%. A bad release measured a success rate of 0.4 to 0.57 on the canary, aborted within about 45 seconds of starting, and left users on the stable revision. Full transcripts are in [docs/CANARY_DEMO.md](docs/CANARY_DEMO.md).
-
-To do it for real, change `env` in [deploy/values.yaml](deploy/values.yaml) (for example `FAIL_RATE: "0.6"`) in a PR. After the merge Argo CD applies it, the canary is judged and rolled back, and the app shows **Degraded** until the commit is reverted. No data at all (a scrape gap, no traffic) pauses the rollout instead of rolling back or promoting. The chart falls back to a plain Deployment on clusters without the Rollouts CRD, so CI and bare clusters still work. See [D-015](docs/DECISIONS.md).
-
-## DORA metrics
-
-```powershell
-python -m dora --repo Amukelani-AJ/cicd-showcase --days 30   # writes build/dora/index.html, report.json, summary.md
-```
-
-The five DORA metrics (deployment frequency, change lead time, failed deployment recovery time, change fail rate, deployment rework rate) are computed from the Publish workflow runs and their pull requests, with the standard library only. A workflow builds the report daily and after every publish. The instability metrics are proxies because canary rollbacks happen inside the cluster, where GitHub cannot see them, and the dashboard shows when lead-time samples are skipped for clock skew. [docs/DORA.md](docs/DORA.md) explains each measurement and its limits; the reasoning is in [D-016](docs/DECISIONS.md).
-
-## Verify a published image
-
-Images are published to GHCR on every merge to `main`, signed keyless with cosign, and shipped with a CycloneDX SBOM attestation and build provenance.
-
-```powershell
-docker pull ghcr.io/amukelani-aj/cicd-showcase:latest
-
-cosign verify ghcr.io/amukelani-aj/cicd-showcase:latest `
-  --certificate-identity-regexp '^https://github.com/Amukelani-AJ/cicd-showcase/\.github/workflows/publish\.yml@refs/(heads/main|tags/v.*)$' `
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com
-
-gh attestation verify oci://ghcr.io/amukelani-aj/cicd-showcase:latest --repo Amukelani-AJ/cicd-showcase
-```
-
-## Security gates
-
-| Gate | Tool | Runs |
-|---|---|---|
-| Secrets in code and history | Gitleaks | PRs, `main`, weekly |
-| Static analysis | Semgrep (pinned) | PRs, `main`, weekly |
-| Dependencies, Dockerfile, workflow config | Trivy (fs) | PRs, `main`, weekly |
-| Built image vulnerabilities | Trivy (image) | every PR |
-| SBOM | Syft, CycloneDX | every PR and release |
-
-All GitHub Actions are pinned to commit SHAs and updated by Dependabot. See D-007 to D-009 in [docs/DECISIONS.md](docs/DECISIONS.md) for the reasoning.
-
-## API
-
-| Route | Purpose |
+| Document | What it is |
 |---|---|
-| `GET /` | Service identity |
-| `GET /health` | Liveness/readiness |
-| `GET /version` | Build version and git SHA, injected at image build time |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Commands, ports, credentials, verification, troubleshooting |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components and which phase delivered each |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | 16 decisions: options considered, constraints, trade-offs |
+| [docs/LESSONS.md](docs/LESSONS.md) | What went wrong, and what I would do differently |
+| [docs/CANARY_DEMO.md](docs/CANARY_DEMO.md) | Real transcripts of the canary promoting and rolling back |
+| [docs/DORA.md](docs/DORA.md) | How each DORA metric is measured and how far to trust it |
+| [docs/API_DESIGN.md](docs/API_DESIGN.md) | The service's routes, metrics and failure injection |
+| [docs/PLAN.md](docs/PLAN.md) | The phased plan and its status |
 
-Details in [docs/API_DESIGN.md](docs/API_DESIGN.md).
+## Known limits
 
-## Design
+This is a demonstration on one machine, not a production platform. The main gaps, with the reasoning in [docs/LESSONS.md](docs/LESSONS.md): the cluster does not yet *refuse* unsigned images; canary rollbacks happen inside the cluster, so the DORA instability metrics are proxies; the canary path is proven by a script and a transcript rather than by CI; `main` has no branch protection; and there is no cloud deployment.
 
-- [Architecture](docs/ARCHITECTURE.md): target topology and the phase that delivers each part
-- [Decision log](docs/DECISIONS.md): why FastAPI, GHCR, kind, pip pins, squash merges
+## How the work is run
 
-## Project conventions
-
-Work happens on branches and lands through pull requests. Every change is recorded in [WORKLOG.md](WORKLOG.md), code files carry cumulative attribution headers, and `scripts/validate-compliance.py` enforces the hygiene rules in CI. See [CLAUDE.md](CLAUDE.md).
+Work happens on branches and lands through pull requests with every check green. Each change is logged in [WORKLOG.md](WORKLOG.md), code files carry cumulative attribution headers, and [scripts/validate-compliance.py](scripts/validate-compliance.py) enforces the hygiene rules in CI. The rules are in [CLAUDE.md](CLAUDE.md).

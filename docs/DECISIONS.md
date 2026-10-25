@@ -13,7 +13,7 @@ Append-only. Superseded decisions stay; add a new entry that supersedes them.
 **Options**: GHCR · Docker Hub · local `kind` registry only
 **Constraints**: free; no extra account; works with `GITHUB_TOKEN`; supports cosign and attestations
 **Decision**: GHCR for published images; a local registry or `kind load` for the in-cluster loop where convenient.
-**Trade-offs**: needs a GitHub remote, which the owner must approve.
+**Trade-offs**: needs a GitHub remote (created: `Amukelani-AJ/cicd-showcase`, public, so the images and attestations are public too).
 **Status**: Accepted
 
 ## D-003: Local Kubernetes runtime (2026-10-25)
