@@ -1,5 +1,6 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Desired state of the running release: which image tag Argo CD deploys
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Enable the ServiceMonitor and the Grafana dashboard for the observability stack
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Enable the canary Rollout and the load generator
 # Release configuration for the cluster. The image tag is rewritten by publish.yml (one commit by
 # github-actions[bot]) after each image is pushed, signed and verified; Argo CD then syncs the
 # cluster to it. Everything else here is edited by hand through PRs. See D-012.
@@ -11,4 +12,10 @@ metrics:
   serviceMonitor:
     enabled: true
 dashboard:
+  enabled: true
+
+# Progressive delivery (P7). Falls back to a plain Deployment on a cluster without the Argo Rollouts CRD.
+rollout:
+  enabled: true
+loadgen:
   enabled: true

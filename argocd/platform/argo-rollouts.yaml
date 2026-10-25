@@ -1,0 +1,32 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Argo CD Application: the Argo Rollouts controller and its CRDs
+# Chart 2.43.8 installs Argo Rollouts v1.10.1 (no published security advisories).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.43.8
+    helm:
+      releaseName: argo-rollouts
+      valuesObject:
+        installCRDs: true
+        dashboard:
+          # Read-only UI for watching canaries: kubectl -n argo-rollouts port-forward svc/argo-rollouts-dashboard 3100
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
