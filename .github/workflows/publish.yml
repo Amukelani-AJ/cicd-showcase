@@ -1,5 +1,5 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Publish the image to GHCR on main and version tags, then smoke-test the pushed image
-# TODO(P3): pin each `uses:` to a full commit SHA (run `pinact run`).
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pinned every action to a commit SHA (bumped to current majors); Dependabot keeps them fresh
 name: Publish
 
 on:
@@ -23,14 +23,14 @@ jobs:
       contents: read
       packages: write # push to GHCR with GITHUB_TOKEN
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Compute lowercase image name
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -38,7 +38,7 @@ jobs:
 
       - name: Image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.IMAGE }}
           tags: |
@@ -48,7 +48,7 @@ jobs:
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: true
