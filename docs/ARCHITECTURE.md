@@ -1,6 +1,6 @@
 # Architecture
 
-Status: target design. Sections are marked by the phase that delivers them; P1 to P7 exist today.
+Status: target design. Sections are marked by the phase that delivers them; P1 to P8 exist today.
 
 ## Overview
 
@@ -34,6 +34,7 @@ Status: target design. Sections are marked by the phase that delivers them; P1 t
 | `k8s/kind-config.yaml` + `charts/cicd-showcase` | Single-node kind cluster (service on `127.0.0.1:8088`) and the hardened Helm chart | P4 |
 | `argocd/application.yaml` + `deploy/values.yaml` | Argo CD Application (automated sync, prune, self-heal) and the image tag it deploys, written by the `promote` job | P5 |
 | `argocd/platform/prometheus-stack.yaml`, `/metrics`, ServiceMonitor, dashboard | Prometheus and Grafana installed by Argo CD; the service exposes request count and latency; a dashboard ships as a ConfigMap | P6 |
+| `dora/` package + `dora.yml` | The five DORA metrics from Publish runs and PRs; JSON, markdown and a self-contained HTML dashboard; Pages deploy once the owner enables it | P8 |
 | Argo Rollouts (`argocd/platform/argo-rollouts.yaml`), chart `rollout.yaml`, `analysistemplate.yaml`, `loadgen.yaml` | Canary 20% → 60% → 100% judged by Prometheus on the canary's own pods; aborts and rolls back automatically | P7 |
 
 ## Layer boundaries (service)

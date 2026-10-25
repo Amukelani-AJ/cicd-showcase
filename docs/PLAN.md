@@ -14,7 +14,7 @@ Status key: ⬜ Not started · 🚀 In Progress · ✅ Done
 | P5 | GitOps with Argo CD | ✅ Done 2026-10-25 |
 | P6 | Observability: Prometheus and Grafana | ✅ Done 2026-10-25 |
 | P7 | Progressive delivery: canary with auto rollback | ✅ Done 2026-10-25 |
-| P8 | DORA metrics dashboard | ⬜ |
+| P8 | DORA metrics dashboard | 🚀 In Progress |
 | P9 | Docs and demo polish | ⬜ |
 
 ---
@@ -83,7 +83,7 @@ CI commits the new image tag to the manifests; Argo CD syncs with self-heal.
 Argo Rollouts canary with a Prometheus AnalysisTemplate; a deliberately broken release must roll itself back.
 
 ## P8: DORA metrics dashboard
-**Status**: ⬜ Not started
+**Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25. Package, tests (99% coverage) and workflow built and run against the real repo. Publishing on GitHub Pages is blocked on the owner enabling Pages and setting `ENABLE_PAGES=true` (repo settings); until then the report is an artifact and run summary.
 **Depends On**: P2
 **Complexity**: Medium
 Deployment frequency, lead time, change failure rate and recovery time from the GitHub API, published on GitHub Pages. Check DORA's current metric definitions first.
