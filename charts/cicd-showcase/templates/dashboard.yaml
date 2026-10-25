@@ -1,0 +1,13 @@
+{{- /* Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Grafana dashboard loaded by the sidecar via the grafana_dashboard label */ -}}
+{{- if .Values.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cicd-showcase.fullname" . }}-dashboard
+  labels:
+    grafana_dashboard: "1"
+    {{- include "cicd-showcase.labels" . | nindent 4 }}
+data:
+  showcase.json: |-
+    {{- .Files.Get "files/dashboard.json" | nindent 4 }}
+{{- end }}
