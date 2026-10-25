@@ -1,5 +1,6 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — CI: compliance, lint, tests, image build (no push yet)
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pinned every action to a commit SHA (bumped to current majors); Dependabot keeps them fresh
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added Trivy image scan and CycloneDX SBOM to the image job
 name: CI
 
 on:
@@ -75,3 +76,17 @@ jobs:
           done
           docker logs smoke
           exit 1
+      - name: Trivy image scan (fails on fixable HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: cicd-showcase:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: cicd-showcase:ci
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+          artifact-name: sbom-ci.cdx.json
