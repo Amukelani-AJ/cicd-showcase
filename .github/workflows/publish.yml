@@ -1,0 +1,87 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Publish the image to GHCR on main and version tags, then smoke-test the pushed image
+# TODO(P3): pin each `uses:` to a full commit SHA (run `pinact run`).
+name: Publish
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false # never abort a push to the registry halfway
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write # push to GHCR with GITHUB_TOKEN
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute lowercase image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the pushed image
+        run: |
+          docker run -d --name published -p 8000:8000 "${IMAGE}@${{ steps.build.outputs.digest }}"
+          for i in $(seq 1 15); do
+            if body=$(curl -fsS http://127.0.0.1:8000/version); then
+              echo "$body"
+              echo "$body" | grep -q "${GITHUB_SHA}" && exit 0
+              echo "git_sha in /version does not match ${GITHUB_SHA}"; exit 1
+            fi
+            sleep 1
+          done
+          docker logs published
+          exit 1
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published"
+            echo "- Image: \`${IMAGE}\`"
+            echo "- Digest: \`${{ steps.build.outputs.digest }}\`"
+            echo "- Tags:"
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

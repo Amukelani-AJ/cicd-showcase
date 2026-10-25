@@ -36,3 +36,10 @@ Append-only. Superseded decisions stay; add a new entry that supersedes them.
 **Decision**: squash merge with a conventional-commit title.
 **Trade-offs**: individual branch commits are lost after merge.
 **Status**: Accepted
+
+## D-006: When to publish images (2026-10-25)
+**Options**: every PR · every push to `main` plus `v*` tags · tags only
+**Constraints**: GHCR storage is free but finite; PR images from forks must never get registry write access; GitOps (P5) needs an image for every merged change
+**Decision**: publish on push to `main` (tags `sha-<short>` and `latest`) and on `v*` tags (semver tags). PRs only build and smoke-test, never push.
+**Trade-offs**: no per-PR images; preview environments would need a separate decision.
+**Status**: Accepted

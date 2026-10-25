@@ -8,7 +8,7 @@ Status key: ⬜ Not started · 🚀 In Progress · ✅ Done
 |---|---|---|
 | P0 | Governance bootstrap | ✅ Done 2026-10-25 |
 | P1 | Walking skeleton: service, tests, container, CI | ✅ Done 2026-10-25 |
-| P2 | Publish to GHCR | ⬜ |
+| P2 | Publish to GHCR | 🚀 In Progress |
 | P3 | Security gates and supply chain | ⬜ |
 | P4 | Local Kubernetes with kind and Helm | ⬜ |
 | P5 | GitOps with Argo CD | ⬜ |
@@ -47,7 +47,7 @@ Delivered together because each piece is meaningless without the others: a servi
 | 1.5 | `ci.yml`: compliance, lint, tests, image build | no push yet |
 
 ## P2: Publish to GHCR
-**Status**: ⬜ Not started
+**Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25. `publish.yml` merged-pending; done when the first run on `main` pushes and smoke-tests an image.
 **Depends On**: P1
 **Complexity**: Low
 Push images to GHCR on `main` with `GITHUB_TOKEN`; tag with git SHA and `latest`. Needs a remote repo, which the owner must approve.
