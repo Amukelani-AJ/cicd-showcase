@@ -1,4 +1,5 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Argo CD Application: Prometheus Operator, Prometheus and Grafana (kube-prometheus-stack)
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Corrected the Grafana credentials comment: the chart generates a random password
 # Trimmed for a single-node kind cluster: no Alertmanager, no node-exporter (needs host mounts that
 # Docker Desktop does not provide), no control-plane scrapes (kind does not expose them), no admission webhook.
 apiVersion: argoproj.io/v1alpha1
@@ -49,8 +50,8 @@ spec:
               limits:
                 memory: 1Gi
         grafana:
-          # Local demo only: reachable through kubectl port-forward, never exposed. The chart's default
-          # login is admin / prom-operator.
+          # Reachable only through kubectl port-forward. The chart generates a random admin password
+          # into the prometheus-stack-grafana secret (user: admin).
           defaultDashboardsEnabled: false
           sidecar:
             dashboards:
