@@ -1,0 +1,97 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — End-to-end GitOps test: Argo CD on kind deploys the chart from Git, then self-heals drift
+name: GitOps e2e
+
+on:
+  pull_request:
+    paths:
+      - "charts/**"
+      - "argocd/**"
+      - "deploy/**"
+      - "k8s/**"
+      - ".github/workflows/gitops-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitops-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ARGOCD_VERSION: v3.5.6 # keep in sync with scripts/cluster.ps1; v3.5.4+ has the 2026-10 repo-server fixes
+  CTX: kind-cicd
+
+jobs:
+  argocd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Create the kind cluster
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        with:
+          cluster_name: cicd
+          config: k8s/kind-config.yaml
+
+      - name: Install Argo CD
+        run: |
+          kubectl --context "$CTX" create namespace argocd
+          kubectl --context "$CTX" apply --server-side --force-conflicts -n argocd \
+            -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+          kubectl --context "$CTX" wait --for=condition=Available deployment --all -n argocd --timeout=300s
+          kubectl --context "$CTX" rollout status statefulset/argocd-application-controller -n argocd --timeout=300s
+
+      - name: Apply the Application, tracking this commit
+        env:
+          # The PR head commit exists on the repo's branch, so Argo CD can fetch it.
+          REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          sed "s|targetRevision: main|targetRevision: ${REVISION}|" argocd/application.yaml \
+            | kubectl --context "$CTX" apply -f -
+
+      - name: Wait for Synced and Healthy
+        run: |
+          for i in $(seq 1 60); do
+            state=$(kubectl --context "$CTX" get application showcase -n argocd \
+              -o 'jsonpath={.status.sync.status}/{.status.health.status}' || true)
+            echo "attempt $i: ${state}"
+            [ "$state" = "Synced/Healthy" ] && exit 0
+            sleep 5
+          done
+          exit 1
+
+      - name: Deployed image matches deploy/values.yaml
+        run: |
+          tag=$(awk '/^[[:space:]]+tag:/ {print $2; exit}' deploy/values.yaml)
+          short=${tag#sha-}
+          echo "expecting an image built from ${short}"
+          for i in $(seq 1 20); do
+            if body=$(curl -fsS http://127.0.0.1:8088/version); then
+              echo "$body"
+              echo "$body" | grep -q "\"git_sha\":\"${short}" && exit 0
+              echo "git_sha does not start with ${short}"; exit 1
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Self-heal reverts manual drift
+        run: |
+          deploy=showcase-cicd-showcase
+          kubectl --context "$CTX" -n showcase scale "deploy/${deploy}" --replicas=5
+          for i in $(seq 1 24); do
+            replicas=$(kubectl --context "$CTX" -n showcase get "deploy/${deploy}" -o 'jsonpath={.spec.replicas}')
+            echo "attempt $i: replicas=${replicas}"
+            [ "$replicas" = "2" ] && exit 0
+            sleep 5
+          done
+          exit 1
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl --context "$CTX" get applications -n argocd -o yaml || true
+          kubectl --context "$CTX" get pods -A || true
+          kubectl --context "$CTX" -n argocd logs deploy/argocd-repo-server --tail=80 || true
