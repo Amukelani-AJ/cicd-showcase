@@ -11,7 +11,7 @@ Status key: ⬜ Not started · 🚀 In Progress · ✅ Done
 | P2 | Publish to GHCR | ✅ Done 2026-10-25 |
 | P3 | Security gates and supply chain | ✅ Done 2026-10-25 |
 | P4 | Local Kubernetes with kind and Helm | 🚀 In Progress |
-| P5 | GitOps with Argo CD | ⬜ |
+| P5 | GitOps with Argo CD | 🚀 In Progress |
 | P6 | Observability: Prometheus and Grafana | ⬜ |
 | P7 | Progressive delivery: canary with auto rollback | ⬜ |
 | P8 | DORA metrics dashboard | ⬜ |
@@ -65,7 +65,7 @@ Gitleaks, Semgrep, Trivy (fs and image), CycloneDX SBOM, keyless cosign signing 
 Needs `kind` and `helm` installed (done via winget, kind v0.33.0 and Helm v4.3.1). Helm chart for the service, `scripts/cluster.ps1`, and a CI job that installs the chart on a fresh kind cluster. No ingress controller: NodePort mapped to `127.0.0.1:8088` (D-010, D-011).
 
 ## P5: GitOps with Argo CD
-**Status**: ⬜ Not started
+**Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25. Verified locally (Synced/Healthy, self-heal in ~5s). Done when the `promote` job has made its first commit on `main`.
 **Depends On**: P4
 **Complexity**: High
 CI commits the new image tag to the manifests; Argo CD syncs with self-heal.

@@ -14,7 +14,7 @@ Built in stages; see [docs/PLAN.md](docs/PLAN.md) for the full roadmap.
 | P2 | Publish to GHCR | Done |
 | P3 | Security gates, SBOM, image signing | Done |
 | P4 | kind and Helm | Done |
-| P5 | Argo CD GitOps | Planned |
+| P5 | Argo CD GitOps | In progress |
 | P6–P7 | Prometheus, canary with auto rollback | Planned |
 | P8 | DORA metrics dashboard | Planned |
 
@@ -47,6 +47,20 @@ Needs Docker, [kind](https://kind.sigs.k8s.io/) and [Helm](https://helm.sh/) (`w
 ```
 
 The script only ever talks to the `kind-cicd` context. CI runs the same flow on a fresh kind cluster for every PR. The chart runs as non-root with a read-only root filesystem, dropped capabilities and resource limits; see [D-010](docs/DECISIONS.md) for why there is no ingress controller.
+
+## GitOps with Argo CD
+
+```powershell
+./scripts/cluster.ps1 gitops        # kind cluster + Argo CD v3.5.6 + the showcase Application
+```
+
+Git is the source of truth for what runs. Merging to `main` publishes an image; a CI job then commits the new `sha-<short>` tag to [deploy/values.yaml](deploy/values.yaml), and Argo CD syncs the cluster to it. CI never holds cluster credentials. Manual changes to the cluster are reverted by self-heal (try `kubectl -n showcase scale deploy/showcase-cicd-showcase --replicas=5`). A `GitOps e2e` workflow proves the whole loop on a fresh cluster for every PR that touches the chart or Argo CD config. See [D-012](docs/DECISIONS.md).
+
+```powershell
+# Argo CD UI at https://localhost:8089 (user: admin)
+kubectl --context kind-cicd -n argocd port-forward svc/argocd-server 8089:443
+kubectl --context kind-cicd -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  # base64-decode it
+```
 
 ## Verify a published image
 

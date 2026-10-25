@@ -78,3 +78,10 @@ Append-only. Superseded decisions stay; add a new entry that supersedes them.
 **Decision**: 8088, unreserved on this machine. If it clashes elsewhere, change `hostPort` in `k8s/kind-config.yaml` and the three references in `scripts/cluster.ps1` and the chart NOTES.
 **Trade-offs**: a non-default port to remember.
 **Status**: Accepted
+
+## D-012: GitOps promotion mechanism and Argo CD version (2026-10-25)
+**Options**: (a) CI commits the new image tag to `deploy/values.yaml` in this repo · (b) a separate environment repo · (c) Argo CD Image Updater · (d) CI opens a PR for the tag bump and auto-merges it
+**Constraints**: free; only this repo may be used; no PATs or other stored secrets (`GITHUB_TOKEN` only); the promotion must not retrigger itself; Git must stay the single source of truth for what runs
+**Decision**: (a). After a verified publish, `publish.yml` rewrites `image.tag` in `deploy/values.yaml` with one commit by `github-actions[bot]`. Commits pushed with `GITHUB_TOKEN` do not trigger workflows, so there is no loop. Argo CD (pinned to v3.5.6; v3.5.4 and later contain the fixes for the three critical repo-server advisories published 2026-10-07) tracks `main` over HTTPS with no credentials because the repo is public, and syncs automatically with prune and self-heal.
+**Trade-offs**: the bot is the one writer allowed to commit directly to `main`, limited to the tag line in `deploy/values.yaml`. If branch protection is enabled later, the bot must be allowed to bypass it, or this should move to option (d). Argo CD polls every 3 minutes by default; a webhook would make it instant but needs a reachable endpoint. Concurrent merges are serialised by a concurrency group, but an out-of-order run could briefly promote an older tag.
+**Status**: Accepted

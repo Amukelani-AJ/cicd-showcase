@@ -1,6 +1,6 @@
 # Architecture
 
-Status: target design. Sections are marked by the phase that delivers them; P1 to P4 exist today.
+Status: target design. Sections are marked by the phase that delivers them; P1 to P5 exist today.
 
 ## Overview
 
@@ -32,7 +32,7 @@ Status: target design. Sections are marked by the phase that delivers them; P1 t
 | GHCR | Image registry | P2 |
 | `security.yml` | Secrets, SAST, vulnerability scanning; SBOM and signing | P3 |
 | `k8s/kind-config.yaml` + `charts/cicd-showcase` | Single-node kind cluster (service on `127.0.0.1:8088`) and the hardened Helm chart | P4 |
-| Argo CD | Pull-based deployment from Git | P5 |
+| `argocd/application.yaml` + `deploy/values.yaml` | Argo CD Application (automated sync, prune, self-heal) and the image tag it deploys, written by the `promote` job | P5 |
 | Prometheus + Grafana | Metrics and dashboards | P6 |
 | Argo Rollouts | Canary releases with metric-driven rollback | P7 |
 
