@@ -1,5 +1,6 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Default values for the cicd-showcase chart
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added env, metrics.serviceMonitor and dashboard values
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added rollout (canary + analysis) and loadgen values
 replicaCount: 2
 
 image:
@@ -58,3 +59,21 @@ metrics:
 dashboard:
   # A ConfigMap labelled grafana_dashboard=1 that the kube-prometheus-stack Grafana sidecar loads.
   enabled: false
+
+rollout:
+  # Uses an Argo Rollout instead of a Deployment, but only when the Rollouts CRD is installed.
+  enabled: false
+  replicas: 5 # more replicas = finer canary weights, because the weight is the share of pods
+  firstWeight: 20
+  secondWeight: 60
+  pause: 45s # lets Prometheus see at least two scrapes of the canary before it is judged
+  analysis:
+    interval: 15s
+    count: 3
+    minSuccessRate: 0.95
+    prometheusAddress: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
+
+loadgen:
+  # A pod that sends a steady trickle of requests so the analysis always has traffic to judge.
+  enabled: false
+  intervalSeconds: 0.2

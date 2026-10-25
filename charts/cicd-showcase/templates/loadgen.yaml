@@ -1,0 +1,49 @@
+{{- /* Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Optional in-cluster traffic generator so canary analysis always has requests to measure */ -}}
+{{- if .Values.loadgen.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cicd-showcase.fullname" . }}-loadgen
+  labels:
+    {{- include "cicd-showcase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: loadgen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "cicd-showcase.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: loadgen
+  template:
+    metadata:
+      labels:
+        {{- include "cicd-showcase.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: loadgen
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: loadgen
+          # The app's own image (already built, signed and pulled), running a tiny request loop.
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-c"]
+          args:
+            - |
+              import time, urllib.request
+              url = "http://{{ include "cicd-showcase.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/"
+              while True:
+                  try:
+                      urllib.request.urlopen(url, timeout=2).read()
+                  except Exception:
+                      pass  # the injected 500s are exactly what the analysis should see
+                  time.sleep({{ .Values.loadgen.intervalSeconds }})
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+{{- end }}
