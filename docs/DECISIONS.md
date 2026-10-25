@@ -89,8 +89,8 @@ Append-only. Superseded decisions stay; add a new entry that supersedes them.
 ## D-013: Image sources in the GitOps e2e job (2026-10-25)
 **Options**: pull from the manifest's registries only · authenticate to each registry · fall back to mirrors of the same official image
 **Constraints**: free; no registry credentials or secrets; the job must not be flaky. `public.ecr.aws` answered GitHub runners with `toomanyrequests: Data limit exceeded` (persistent, so retries do not help); the same pull works from a home IP.
-**Decision**: the job pre-pulls every image in the Argo CD manifest. For `public.ecr.aws/docker/library/*` it falls back to `mirror.gcr.io/library/*`, then `docker.io/library/*`, re-tags the result to the original name and side-loads it into kind. Argo CD itself and the manifest stay untouched.
-**Trade-offs**: the test may run a byte-identical copy of the image from a mirror rather than ECR; tags are mutable, so this relies on the official image tag. Real clusters installing Argo CD are unaffected.
+**Decision**: the job pre-pulls every image in the Argo CD manifest. For `public.ecr.aws/docker/library/*` it falls back to `mirror.gcr.io/library/*`, then `docker.io/library/*`, re-tags the result to the original name and side-loads it into kind. The downloaded manifest is also patched from `imagePullPolicy: Always` to `IfNotPresent` (the stock manifest forces a registry pull on every container, which defeats side-loading; the first fix without this passed only by luck). Argo CD itself is untouched.
+**Trade-offs**: the test runs a slightly modified manifest and may use a byte-identical copy of the image from a mirror rather than ECR; tags are mutable, so this relies on the official image tag. Real clusters installing Argo CD are unaffected.
 **Status**: Accepted
 
 ## D-014: Metrics and dashboards stack (2026-10-25)

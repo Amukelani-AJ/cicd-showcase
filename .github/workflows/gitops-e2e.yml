@@ -1,6 +1,7 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — End-to-end GitOps test: Argo CD on kind deploys the chart from Git, then self-heals drift
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pre-pull Argo CD images with retries after redis hit ImagePullBackOff on the runner; describe pods on failure
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Fall back to mirror.gcr.io and docker.io for the redis image: public.ecr.aws throttles GitHub runners
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Switch imagePullPolicy Always to IfNotPresent so the side-loaded images are actually used
 name: GitOps e2e
 
 on:
@@ -71,6 +72,9 @@ jobs:
 
       - name: Install Argo CD
         run: |
+          # The stock manifest sets imagePullPolicy: Always, which makes the kubelet ignore the images
+          # side-loaded above and hit the throttled registry anyway. Test harness only (see D-013).
+          sed -i 's/imagePullPolicy: Always/imagePullPolicy: IfNotPresent/' install.yaml
           kubectl --context "$CTX" create namespace argocd
           kubectl --context "$CTX" apply --server-side --force-conflicts -n argocd -f install.yaml
           kubectl --context "$CTX" wait --for=condition=Available deployment --all -n argocd --timeout=300s
