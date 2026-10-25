@@ -1,6 +1,7 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — CI: compliance, lint, tests, image build (no push yet)
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pinned every action to a commit SHA (bumped to current majors); Dependabot keeps them fresh
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added Trivy image scan and CycloneDX SBOM to the image job
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pass github.base_ref via env to fix a Semgrep shell-injection finding
 name: CI
 
 on:
@@ -28,7 +29,9 @@ jobs:
           python-version: "3.12"
       - name: Compliance checks (PR)
         if: github.event_name == 'pull_request'
-        run: python scripts/validate-compliance.py --strict --base origin/${{ github.base_ref }}
+        env:
+          BASE_REF: ${{ github.base_ref }} # via env, never interpolated into the script
+        run: python scripts/validate-compliance.py --strict --base "origin/${BASE_REF}"
       - name: Compliance checks (push)
         if: github.event_name == 'push'
         run: python scripts/validate-compliance.py
