@@ -1,6 +1,6 @@
 # Architecture
 
-Status: target design. Sections are marked by the phase that delivers them; P1 to P8 exist today.
+Status: target design. Sections are marked by the phase that delivers them; P1 to P9 exist today (everything in the plan is built).
 
 ## Overview
 
