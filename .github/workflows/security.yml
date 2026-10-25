@@ -41,7 +41,7 @@ jobs:
         run: >
           semgrep scan --error --metrics off
           --config p/python --config p/dockerfile --config p/github-actions
-          app Dockerfile .github
+          app dora Dockerfile .github
 
   vulnerabilities:
     runs-on: ubuntu-latest

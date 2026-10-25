@@ -17,7 +17,7 @@ Built in stages; see [docs/PLAN.md](docs/PLAN.md) for the full roadmap.
 | P5 | Argo CD GitOps | Done |
 | P6 | Prometheus and Grafana | Done |
 | P7 | Canary with automatic rollback | Done |
-| P8 | DORA metrics dashboard | Planned |
+| P8 | DORA metrics dashboard | In progress |
 
 ## Run it
 
@@ -88,6 +88,14 @@ kubectl --context kind-cicd -n argo-rollouts port-forward svc/argo-rollouts-dash
 A good release was promoted in about three minutes with every measurement at 100%. A bad release measured a success rate of 0.4 to 0.57 on the canary, aborted within about 45 seconds of starting, and left users on the stable revision. Full transcripts are in [docs/CANARY_DEMO.md](docs/CANARY_DEMO.md).
 
 To do it for real, change `env` in [deploy/values.yaml](deploy/values.yaml) (for example `FAIL_RATE: "0.6"`) in a PR. After the merge Argo CD applies it, the canary is judged and rolled back, and the app shows **Degraded** until the commit is reverted. No data at all (a scrape gap, no traffic) pauses the rollout instead of rolling back or promoting. The chart falls back to a plain Deployment on clusters without the Rollouts CRD, so CI and bare clusters still work. See [D-015](docs/DECISIONS.md).
+
+## DORA metrics
+
+```powershell
+python -m dora --repo Amukelani-AJ/cicd-showcase --days 30   # writes build/dora/index.html, report.json, summary.md
+```
+
+The five DORA metrics (deployment frequency, change lead time, failed deployment recovery time, change fail rate, deployment rework rate) are computed from the Publish workflow runs and their pull requests, with the standard library only. A workflow builds the report daily and after every publish. The instability metrics are proxies because canary rollbacks happen inside the cluster, where GitHub cannot see them, and the dashboard shows when lead-time samples are skipped for clock skew. [docs/DORA.md](docs/DORA.md) explains each measurement and its limits; the reasoning is in [D-016](docs/DECISIONS.md).
 
 ## Verify a published image
 
