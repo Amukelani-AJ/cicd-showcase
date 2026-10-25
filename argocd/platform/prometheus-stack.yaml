@@ -1,0 +1,67 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Argo CD Application: Prometheus Operator, Prometheus and Grafana (kube-prometheus-stack)
+# Trimmed for a single-node kind cluster: no Alertmanager, no node-exporter (needs host mounts that
+# Docker Desktop does not provide), no control-plane scrapes (kind does not expose them), no admission webhook.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-stack
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 92.13.1
+    helm:
+      releaseName: prometheus-stack
+      valuesObject:
+        defaultRules:
+          create: false
+        alertmanager:
+          enabled: false
+        nodeExporter:
+          enabled: false
+        kubeEtcd:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeProxy:
+          enabled: false
+        prometheusOperator:
+          admissionWebhooks:
+            enabled: false
+          tls:
+            enabled: false
+        prometheus:
+          prometheusSpec:
+            retention: 6h
+            # Pick up every ServiceMonitor and PodMonitor, not only ones labelled for this Helm release.
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            resources:
+              requests:
+                cpu: 100m
+                memory: 400Mi
+              limits:
+                memory: 1Gi
+        grafana:
+          # Local demo only: reachable through kubectl port-forward, never exposed. The chart's default
+          # login is admin / prom-operator.
+          defaultDashboardsEnabled: false
+          sidecar:
+            dashboards:
+              searchNamespace: ALL
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true # the Prometheus Operator CRDs are too large for client-side apply

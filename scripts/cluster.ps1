@@ -5,6 +5,7 @@
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Quote the resource list so PowerShell does not split it on commas
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added the gitops action: install Argo CD v3.5.6 and apply the Application
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — gitops: wait on workloads, not pods; add -Revision to track a branch
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — gitops: install the Prometheus stack first (-NoPlatform to skip)
 <#
 .SYNOPSIS
   Manage the local kind cluster for this project.
@@ -14,6 +15,7 @@
   ./scripts/cluster.ps1 up -Local          # build the local Dockerfile and load it into the cluster
   ./scripts/cluster.ps1 gitops             # cluster + Argo CD; Argo CD deploys the chart from Git (replaces `up`)
   ./scripts/cluster.ps1 gitops -Revision my-branch   # track a branch or commit instead of main
+  ./scripts/cluster.ps1 gitops -NoPlatform           # skip Prometheus and Grafana
   ./scripts/cluster.ps1 status
   ./scripts/cluster.ps1 down
 .NOTES
@@ -23,7 +25,8 @@ param(
     [Parameter(Mandatory)][ValidateSet('up', 'gitops', 'down', 'status')][string]$Action,
     [string]$Tag = 'latest',
     [string]$Revision = '', # gitops: track this branch or commit instead of main (testing unmerged changes)
-    [switch]$Local
+    [switch]$Local,
+    [switch]$NoPlatform # gitops: skip the Prometheus/Grafana stack (lighter, no metrics)
 )
 
 # Windows PowerShell 5.1 turns native stderr (kind, helm and docker log progress there) into
@@ -36,6 +39,17 @@ $Release = 'showcase'
 $ArgoVersion = 'v3.5.6'
 $ArgoInstallUrl = "https://raw.githubusercontent.com/argoproj/argo-cd/$ArgoVersion/manifests/install.yaml"
 $Root = Split-Path -Parent $PSScriptRoot
+
+function Wait-ArgoApp([string]$Name, [int]$Seconds) {
+    $state = ''
+    foreach ($i in 1..($Seconds / 5)) {
+        $state = (kubectl --context $Context get application $Name -n argocd -o 'jsonpath={.status.sync.status}/{.status.health.status}' 2>$null)
+        if ($state -eq 'Synced/Healthy') { break }
+        Start-Sleep -Seconds 5
+    }
+    Write-Host "Application $Name is $state"
+    if ($state -ne 'Synced/Healthy') { throw "$Name did not reach Synced/Healthy within $Seconds s" }
+}
 
 function Test-Cluster { (@(kind get clusters 2>&1) | ForEach-Object { "$_" }) -contains $Cluster }
 
@@ -98,19 +112,18 @@ switch ($Action) {
         kubectl --context $Context rollout status statefulset/argocd-application-controller -n argocd --timeout=300s
         if ($LASTEXITCODE -ne 0) { throw 'Argo CD application controller did not become ready' }
 
+        # The platform goes first: the showcase chart only renders its ServiceMonitor once the CRDs exist.
+        if (-not $NoPlatform) {
+            kubectl --context $Context apply -f "$Root/argocd/platform/prometheus-stack.yaml"
+            if ($LASTEXITCODE -ne 0) { throw 'Applying the Prometheus stack Application failed' }
+            Wait-ArgoApp 'prometheus-stack' 900
+        }
+
         $manifest = Get-Content "$Root/argocd/application.yaml" -Raw
         if ($Revision) { $manifest = $manifest -replace 'targetRevision: main', "targetRevision: $Revision" }
         $manifest | kubectl --context $Context apply -f -
         if ($LASTEXITCODE -ne 0) { throw 'Applying the Application failed' }
-
-        $state = ''
-        foreach ($i in 1..60) {
-            $state = (kubectl --context $Context get application $Release -n argocd -o 'jsonpath={.status.sync.status}/{.status.health.status}' 2>$null)
-            if ($state -eq 'Synced/Healthy') { break }
-            Start-Sleep -Seconds 5
-        }
-        Write-Host "Application $Release is $state"
-        if ($state -ne 'Synced/Healthy') { throw 'Argo CD did not reach Synced/Healthy within 5 minutes' }
+        Wait-ArgoApp $Release 300
         Write-Host 'GET http://localhost:8088/version ->' (Wait-Http 'http://localhost:8088/version' | ConvertTo-Json -Compress)
     }
     'down' {

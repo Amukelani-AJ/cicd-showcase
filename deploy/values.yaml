@@ -1,5 +1,14 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Desired state of the running release: which image tag Argo CD deploys
-# Only the image tag lives here. publish.yml rewrites it (one commit by github-actions[bot]) after
-# each image is pushed, signed and verified. Argo CD then syncs the cluster to it. See D-012.
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Enable the ServiceMonitor and the Grafana dashboard for the observability stack
+# Release configuration for the cluster. The image tag is rewritten by publish.yml (one commit by
+# github-actions[bot]) after each image is pushed, signed and verified; Argo CD then syncs the
+# cluster to it. Everything else here is edited by hand through PRs. See D-012.
 image:
   tag: sha-f22f668
+
+# Observability (P6). Both are no-ops on a cluster without the Prometheus Operator CRDs / Grafana.
+metrics:
+  serviceMonitor:
+    enabled: true
+dashboard:
+  enabled: true
