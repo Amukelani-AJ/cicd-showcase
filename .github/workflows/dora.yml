@@ -1,0 +1,68 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Build the DORA metrics report daily and after each publish; deploy it to GitHub Pages once Pages is enabled
+name: DORA metrics
+
+on:
+  schedule:
+    - cron: "30 5 * * *" # daily, so the window keeps moving even when nothing ships
+  workflow_run:
+    workflows: [Publish]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dora
+  cancel-in-progress: true
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read # list Publish workflow runs
+      pull-requests: read # map each deployed commit to its pull request
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Build the report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -m dora --repo "$GITHUB_REPOSITORY" --days 30 --out build/dora
+      - name: Show it in the run summary
+        run: cat build/dora/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the report as an artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dora-report
+          path: build/dora
+          retention-days: 30
+      - name: Package the dashboard for Pages
+        if: vars.ENABLE_PAGES == 'true'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: build/dora
+
+  pages:
+    # Needs two switches that only the repo owner can flip: Settings > Pages > Source: GitHub Actions,
+    # and a repository variable ENABLE_PAGES=true. Until then this job is skipped and the report above
+    # is still available as an artifact and in the run summary.
+    needs: report
+    if: vars.ENABLE_PAGES == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
