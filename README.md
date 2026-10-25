@@ -14,8 +14,9 @@ Built in stages; see [docs/PLAN.md](docs/PLAN.md) for the full roadmap.
 | P2 | Publish to GHCR | Done |
 | P3 | Security gates, SBOM, image signing | Done |
 | P4 | kind and Helm | Done |
-| P5 | Argo CD GitOps | In progress |
-| P6–P7 | Prometheus, canary with auto rollback | Planned |
+| P5 | Argo CD GitOps | Done |
+| P6 | Prometheus and Grafana | In progress |
+| P7 | Canary with automatic rollback | Planned |
 | P8 | DORA metrics dashboard | Planned |
 
 ## Run it
@@ -61,6 +62,17 @@ Git is the source of truth for what runs. Merging to `main` publishes an image; 
 kubectl --context kind-cicd -n argocd port-forward svc/argocd-server 8089:443
 kubectl --context kind-cicd -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  # base64-decode it
 ```
+
+## Observability
+
+`./scripts/cluster.ps1 gitops` also installs Prometheus and Grafana (kube-prometheus-stack, via Argo CD). The service exposes `http_requests_total` and `http_request_duration_seconds` on `/metrics`; its ServiceMonitor and a **CI/CD Showcase** Grafana dashboard ship with the chart. Skip all of it with `-NoPlatform`.
+
+```powershell
+kubectl --context kind-cicd -n monitoring port-forward svc/prometheus-stack-grafana 3000:80      # http://localhost:3000  (admin / prom-operator)
+kubectl --context kind-cicd -n monitoring port-forward svc/prometheus-stack-kube-prom-prometheus 9090   # http://localhost:9090
+```
+
+The login is the chart default, acceptable only because Grafana is reachable solely through `port-forward` on a local cluster. Setting `FAIL_RATE` (0 to 1) on the service makes `GET /` fail on purpose; the canary release in P7 uses it to prove an automatic rollback. See [D-014](docs/DECISIONS.md).
 
 ## Verify a published image
 

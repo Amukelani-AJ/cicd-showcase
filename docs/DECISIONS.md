@@ -92,3 +92,10 @@ Append-only. Superseded decisions stay; add a new entry that supersedes them.
 **Decision**: the job pre-pulls every image in the Argo CD manifest. For `public.ecr.aws/docker/library/*` it falls back to `mirror.gcr.io/library/*`, then `docker.io/library/*`, re-tags the result to the original name and side-loads it into kind. Argo CD itself and the manifest stay untouched.
 **Trade-offs**: the test may run a byte-identical copy of the image from a mirror rather than ECR; tags are mutable, so this relies on the official image tag. Real clusters installing Argo CD are unaffected.
 **Status**: Accepted
+
+## D-014: Metrics and dashboards stack (2026-10-25)
+**Options**: kube-prometheus-stack (Prometheus Operator, Prometheus, Grafana) · the plain `prometheus` chart with annotation-based scraping · VictoriaMetrics · a hosted service
+**Constraints**: free and local; GitOps-managed; must support ServiceMonitors so apps declare their own scrape config; Argo Rollouts (P7) will query it for canary analysis
+**Decision**: kube-prometheus-stack 92.13.1, installed by an Argo CD Application, trimmed for a single-node kind cluster: no Alertmanager, no node-exporter (needs host mounts Docker Desktop lacks), no control-plane scrapes (kind does not expose them), no admission webhook, no default rules or dashboards, 6h retention. The app ships its own ServiceMonitor and a dashboard ConfigMap (label `grafana_dashboard=1`) that Grafana's sidecar loads. The chart renders the ServiceMonitor only when the CRD exists, so it still installs on a bare cluster.
+**Trade-offs**: heavier than the plain chart; its CRDs need `ServerSideApply=true`. Grafana keeps the chart's default login (`admin` / `prom-operator`), acceptable only because it is a ClusterIP service reached through `kubectl port-forward` on a local cluster. The metric labels use the route template, so cardinality stays bounded.
+**Status**: Accepted
