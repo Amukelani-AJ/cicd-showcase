@@ -1,4 +1,5 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — End-to-end GitOps test: Argo CD on kind deploys the chart from Git, then self-heals drift
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pre-pull Argo CD images with retries after redis hit ImagePullBackOff on the runner; describe pods on failure
 name: GitOps e2e
 
 on:
@@ -35,11 +36,24 @@ jobs:
           cluster_name: cicd
           config: k8s/kind-config.yaml
 
+      - name: Download the Argo CD manifest and pre-pull its images
+        # A throttled public registry (redis comes from public.ecr.aws) otherwise leaves a pod in
+        # ImagePullBackOff for minutes. Pull with retries here, then side-load into the cluster.
+        run: |
+          curl -fsS "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml" -o install.yaml
+          for img in $(grep -E '^[[:space:]]+image:' install.yaml | sed -E 's/^[[:space:]]+image:[[:space:]]*//' | sort -u); do
+            for attempt in 1 2 3 4 5; do
+              docker pull "$img" && break
+              [ "$attempt" -eq 5 ] && { echo "could not pull $img"; exit 1; }
+              echo "pull of $img failed (attempt $attempt), retrying"; sleep $((attempt * 10))
+            done
+            kind load docker-image "$img" --name cicd
+          done
+
       - name: Install Argo CD
         run: |
           kubectl --context "$CTX" create namespace argocd
-          kubectl --context "$CTX" apply --server-side --force-conflicts -n argocd \
-            -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+          kubectl --context "$CTX" apply --server-side --force-conflicts -n argocd -f install.yaml
           kubectl --context "$CTX" wait --for=condition=Available deployment --all -n argocd --timeout=300s
           kubectl --context "$CTX" rollout status statefulset/argocd-application-controller -n argocd --timeout=300s
 
@@ -94,4 +108,5 @@ jobs:
         run: |
           kubectl --context "$CTX" get applications -n argocd -o yaml || true
           kubectl --context "$CTX" get pods -A || true
+          kubectl --context "$CTX" -n argocd describe pods || true
           kubectl --context "$CTX" -n argocd logs deploy/argocd-repo-server --tail=80 || true
