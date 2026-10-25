@@ -1,0 +1,5 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Desired state of the running release: which image tag Argo CD deploys
+# Only the image tag lives here. publish.yml rewrites it (one commit by github-actions[bot]) after
+# each image is pushed, signed and verified. Argo CD then syncs the cluster to it. See D-012.
+image:
+  tag: sha-a3c87af

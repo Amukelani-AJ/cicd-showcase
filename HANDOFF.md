@@ -1,22 +1,22 @@
 # Handoff — updated 2026-10-25 (Claude Sonnet 5.5)
-**Branch**: feature/P4-kind-helm   **Phase**: P0–P3 done; P4 in PR
+**Branch**: feature/P5-gitops-argocd   **Phase**: P0–P4 done; P5 in PR
 
 ## Standing instruction
 Owner is away and asked me to keep working unattended: commit often, merge my own PRs once every CI check is green, work through `docs/PLAN.md`. See `CLAUDE.md` for the rules and the "Still needs the owner" list.
 
 ## Done
-- P0–P3 merged (PRs #1 to #4). Published image on GHCR is public, signed (cosign keyless), has a CycloneDX SBOM attestation and build provenance; `gh attestation verify` passes from outside CI.
-- P4 (this PR): Helm chart `charts/cicd-showcase`, `k8s/kind-config.yaml`, `scripts/cluster.ps1`, a `k8s` CI job that installs the chart on a fresh kind cluster, D-010 and D-011.
+- P0–P4 merged (PRs #1 to #5). Published image on GHCR is public, signed (cosign keyless), has a CycloneDX SBOM attestation and build provenance; `gh attestation verify` passes from outside CI.
+- P4: Helm chart, kind config, `scripts/cluster.ps1`, `k8s` CI job, D-010, D-011.
+- P5 (this PR): `argocd/application.yaml`, `deploy/values.yaml`, `cluster.ps1 gitops`, a `promote` job in `publish.yml` (bot commits the new tag to `deploy/values.yaml` on main), `gitops-e2e.yml`, D-012.
 - Installed with winget: kind v0.33.0, Helm v4.3.1.
 
 ## State of the local machine
-- A kind cluster named `cicd` is running (context `kind-cicd`) with release `showcase` deployed from the local image (`image.tag=dev`). Service on http://localhost:8088. Reset with `./scripts/cluster.ps1 up` (GHCR image) or `down`.
+- A kind cluster named `cicd` is running (context `kind-cicd`) with Argo CD v3.5.6 and the `showcase` Application (currently tracking branch `feature/P5-gitops-argocd`; after merge re-run `./scripts/cluster.ps1 gitops` to track `main`). Service on http://localhost:8088. `down` deletes the cluster.
 - Port 8080 is held by an unrelated process (PID 5812 at the time); do not kill it. That is why the cluster uses 8088.
 
 ## Next steps (ordered)
-1. Confirm the P4 PR is merged and green; mark P4 done in `docs/PLAN.md`.
-2. P5: Argo CD on the kind cluster; CI commits the new image tag to the manifests; self-heal sync.
-3. P6 observability, P7 canary rollback, P8 DORA, P9 polish.
+1. After the P5 PR merges, watch the first `Publish` run on `main`: the `promote` job must push a `chore(deploy): promote sha-...` commit. This job cannot be tested before merge. If it fails, fix it (check repo Actions permissions and push rejection), then mark P5 done in `docs/PLAN.md`/README.
+2. P6 observability (`/metrics`, Prometheus, Grafana), P7 canary rollback (Argo Rollouts), P8 DORA, P9 polish.
 
 ## Gotchas
 - Venv lives at `%LOCALAPPDATA%\venvs\cicd` (the folder is under OneDrive).
@@ -24,6 +24,7 @@ Owner is away and asked me to keep working unattended: commit often, merge my ow
 - New shells need the PATH refreshed to find kind and Helm: `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`.
 - Windows PowerShell 5.1: native stderr becomes an error under `$ErrorActionPreference='Stop'`; use exit codes. `Invoke-RestMethod` to localhost failed here, `curl.exe` works.
 - The shipping helper is in the session scratchpad (`ship.sh`), not the repo. Manual flow: push, `gh pr create`, `gh pr checks <n> --watch`, `gh pr merge <n> --squash --delete-branch`.
+- The `promote` bot is the only writer allowed to commit directly to `main` (D-012). If branch protection is ever enabled it must be allowed to bypass.
 - Semgrep already caught one real finding (shell injection in a workflow). Fix findings, never weaken the gate.
 - Tests print a Starlette deprecation warning about `httpx`/`httpx2`. Harmless today.
 - Branch protection is not enabled (changing repo settings needs the owner).

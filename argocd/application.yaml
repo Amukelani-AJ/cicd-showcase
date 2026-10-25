@@ -1,0 +1,27 @@
+# Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Argo CD Application: deploy the chart from Git with the tag in deploy/values.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: showcase
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Amukelani-AJ/cicd-showcase.git
+    targetRevision: main
+    path: charts/cicd-showcase
+    helm:
+      releaseName: showcase
+      valueFiles:
+        - ../../deploy/values.yaml # relative to the chart path, inside the same repo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: showcase
+  syncPolicy:
+    automated:
+      prune: true # remove what is no longer in Git
+      selfHeal: true # revert manual drift in the cluster
+    syncOptions:
+      - CreateNamespace=true

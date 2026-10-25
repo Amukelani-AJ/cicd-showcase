@@ -3,6 +3,8 @@
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Host port 8088 (8080 is taken on this machine)
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Probe with curl.exe instead of Invoke-RestMethod
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Quote the resource list so PowerShell does not split it on commas
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added the gitops action: install Argo CD v3.5.6 and apply the Application
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — gitops: wait on workloads, not pods; add -Revision to track a branch
 <#
 .SYNOPSIS
   Manage the local kind cluster for this project.
@@ -10,14 +12,17 @@
   ./scripts/cluster.ps1 up                 # cluster + chart using the published GHCR image (latest)
   ./scripts/cluster.ps1 up -Tag sha-1a2b3c4
   ./scripts/cluster.ps1 up -Local          # build the local Dockerfile and load it into the cluster
+  ./scripts/cluster.ps1 gitops             # cluster + Argo CD; Argo CD deploys the chart from Git (replaces `up`)
+  ./scripts/cluster.ps1 gitops -Revision my-branch   # track a branch or commit instead of main
   ./scripts/cluster.ps1 status
   ./scripts/cluster.ps1 down
 .NOTES
   Every kubectl/helm call is pinned to the kind-cicd context so no other cluster is ever touched.
 #>
 param(
-    [Parameter(Mandatory)][ValidateSet('up', 'down', 'status')][string]$Action,
+    [Parameter(Mandatory)][ValidateSet('up', 'gitops', 'down', 'status')][string]$Action,
     [string]$Tag = 'latest',
+    [string]$Revision = '', # gitops: track this branch or commit instead of main (testing unmerged changes)
     [switch]$Local
 )
 
@@ -27,6 +32,9 @@ $ErrorActionPreference = 'Continue'
 $Cluster = 'cicd'
 $Context = "kind-$Cluster"
 $Release = 'showcase'
+# Pinned: v3.5.4+ contains the fixes for the 2026-10-07 repo-server advisories (see D-012).
+$ArgoVersion = 'v3.5.6'
+$ArgoInstallUrl = "https://raw.githubusercontent.com/argoproj/argo-cd/$ArgoVersion/manifests/install.yaml"
 $Root = Split-Path -Parent $PSScriptRoot
 
 function Test-Cluster { (@(kind get clusters 2>&1) | ForEach-Object { "$_" }) -contains $Cluster }
@@ -67,8 +75,43 @@ switch ($Action) {
     }
     'status' {
         if (-not (Test-Cluster)) { Write-Host "Cluster '$Cluster' does not exist"; return }
-        kubectl --context $Context get 'nodes,pods,svc' -o wide
+        kubectl --context $Context get 'nodes,pods,svc' -A -o wide
+        kubectl --context $Context get applications -n argocd 2>&1 | ForEach-Object { "$_" }
         Write-Host 'GET http://localhost:8088/version ->' (Wait-Http 'http://localhost:8088/version' 5 | ConvertTo-Json -Compress)
+    }
+    'gitops' {
+        if (-not (Test-Cluster)) {
+            kind create cluster --config "$Root/k8s/kind-config.yaml"
+            if ($LASTEXITCODE -ne 0) { throw 'kind create cluster failed' }
+        }
+
+        # Argo CD becomes the only thing that deploys the app, so drop a direct Helm release if `up` made one.
+        helm uninstall $Release --kube-context $Context 2>&1 | Out-Null
+
+        kubectl --context $Context create namespace argocd --dry-run=client -o yaml | kubectl --context $Context apply -f -
+        # Server-side apply: the ApplicationSet CRD is too large for client-side apply.
+        kubectl --context $Context apply --server-side --force-conflicts -n argocd -f $ArgoInstallUrl
+        if ($LASTEXITCODE -ne 0) { throw 'Argo CD install failed' }
+        # Wait on the workloads, not on pods: pods do not exist yet right after the apply.
+        kubectl --context $Context wait --for=condition=Available deployment --all -n argocd --timeout=300s
+        if ($LASTEXITCODE -ne 0) { throw 'Argo CD deployments did not become available' }
+        kubectl --context $Context rollout status statefulset/argocd-application-controller -n argocd --timeout=300s
+        if ($LASTEXITCODE -ne 0) { throw 'Argo CD application controller did not become ready' }
+
+        $manifest = Get-Content "$Root/argocd/application.yaml" -Raw
+        if ($Revision) { $manifest = $manifest -replace 'targetRevision: main', "targetRevision: $Revision" }
+        $manifest | kubectl --context $Context apply -f -
+        if ($LASTEXITCODE -ne 0) { throw 'Applying the Application failed' }
+
+        $state = ''
+        foreach ($i in 1..60) {
+            $state = (kubectl --context $Context get application $Release -n argocd -o 'jsonpath={.status.sync.status}/{.status.health.status}' 2>$null)
+            if ($state -eq 'Synced/Healthy') { break }
+            Start-Sleep -Seconds 5
+        }
+        Write-Host "Application $Release is $state"
+        if ($state -ne 'Synced/Healthy') { throw 'Argo CD did not reach Synced/Healthy within 5 minutes' }
+        Write-Host 'GET http://localhost:8088/version ->' (Wait-Http 'http://localhost:8088/version' | ConvertTo-Json -Compress)
     }
     'down' {
         if (Test-Cluster) { kind delete cluster --name $Cluster } else { Write-Host "Cluster '$Cluster' does not exist" }

@@ -1,6 +1,7 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Publish the image to GHCR on main and version tags, then smoke-test the pushed image
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pinned every action to a commit SHA (bumped to current majors); Dependabot keeps them fresh
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added keyless cosign signing, SBOM attestation, build provenance and self-verification
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added the promote job: commit the new image tag to deploy/values.yaml for Argo CD
 name: Publish
 
 on:
@@ -133,3 +134,33 @@ jobs:
             echo "${TAGS}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  promote:
+    # GitOps hand-off: record the new image tag in Git. Argo CD does the actual deploy (D-012).
+    # Commits pushed with GITHUB_TOKEN do not trigger workflows, so this cannot loop.
+    needs: publish
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: promote
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main # the tip of main, which may be ahead of the commit that was built
+      - name: Point deploy/values.yaml at the new image
+        run: |
+          tag="sha-${GITHUB_SHA:0:7}"
+          sed -i -E "s/^([[:space:]]*tag:[[:space:]]*).*/\1${tag}/" deploy/values.yaml
+          if git diff --quiet; then echo "deploy/values.yaml already at ${tag}"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(deploy): promote ${tag}"
+          for attempt in 1 2 3; do
+            git push origin HEAD:main && exit 0
+            git pull --rebase origin main
+          done
+          exit 1
