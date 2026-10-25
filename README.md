@@ -12,8 +12,9 @@ Built in stages; see [docs/PLAN.md](docs/PLAN.md) for the full roadmap.
 |---|---|---|
 | P1 | Service, tests, container, CI | Done |
 | P2 | Publish to GHCR | Done |
-| P3 | Security gates, SBOM, image signing | In progress |
-| P4–P5 | kind, Helm, Argo CD GitOps | Planned |
+| P3 | Security gates, SBOM, image signing | Done |
+| P4 | kind and Helm | Done |
+| P5 | Argo CD GitOps | Planned |
 | P6–P7 | Prometheus, canary with auto rollback | Planned |
 | P8 | DORA metrics dashboard | Planned |
 
@@ -32,6 +33,20 @@ The same checks GitHub runs (lint, format, tests with an 80% coverage gate), in 
 ```powershell
 docker compose -f docker-compose.ci.yml --profile python run --rm ci-python
 ```
+
+## Run it on local Kubernetes
+
+Needs Docker, [kind](https://kind.sigs.k8s.io/) and [Helm](https://helm.sh/) (`winget install Kubernetes.kind Helm.Helm`).
+
+```powershell
+./scripts/cluster.ps1 up            # kind cluster + chart, using the published GHCR image
+./scripts/cluster.ps1 up -Local     # same, but builds and loads your local Dockerfile
+./scripts/cluster.ps1 status
+./scripts/cluster.ps1 down
+# http://localhost:8088/version
+```
+
+The script only ever talks to the `kind-cicd` context. CI runs the same flow on a fresh kind cluster for every PR. The chart runs as non-root with a read-only root filesystem, dropped capabilities and resource limits; see [D-010](docs/DECISIONS.md) for why there is no ingress controller.
 
 ## Verify a published image
 

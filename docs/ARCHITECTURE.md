@@ -1,6 +1,6 @@
 # Architecture
 
-Status: target design. Sections are marked by the phase that delivers them; only P1 exists today.
+Status: target design. Sections are marked by the phase that delivers them; P1 to P4 exist today.
 
 ## Overview
 
@@ -31,7 +31,7 @@ Status: target design. Sections are marked by the phase that delivers them; only
 | `docker-compose.ci.yml` | Runs the same checks locally in Docker | P1 |
 | GHCR | Image registry | P2 |
 | `security.yml` | Secrets, SAST, vulnerability scanning; SBOM and signing | P3 |
-| kind + Helm chart | Local cluster and deployment package | P4 |
+| `k8s/kind-config.yaml` + `charts/cicd-showcase` | Single-node kind cluster (service on `127.0.0.1:8088`) and the hardened Helm chart | P4 |
 | Argo CD | Pull-based deployment from Git | P5 |
 | Prometheus + Grafana | Metrics and dashboards | P6 |
 | Argo Rollouts | Canary releases with metric-driven rollback | P7 |

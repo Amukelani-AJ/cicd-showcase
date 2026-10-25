@@ -62,7 +62,7 @@ Gitleaks, Semgrep, Trivy (fs and image), CycloneDX SBOM, keyless cosign signing 
 **Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25
 **Depends On**: P2
 **Complexity**: Medium
-Needs `kind` and `helm` installed. Helm chart for the service.
+Needs `kind` and `helm` installed (done via winget, kind v0.33.0 and Helm v4.3.1). Helm chart for the service, `scripts/cluster.ps1`, and a CI job that installs the chart on a fresh kind cluster. No ingress controller: NodePort mapped to `127.0.0.1:8088` (D-010, D-011).
 
 ## P5: GitOps with Argo CD
 **Status**: ⬜ Not started

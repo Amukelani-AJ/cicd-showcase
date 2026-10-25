@@ -64,3 +64,17 @@ Append-only. Superseded decisions stay; add a new entry that supersedes them.
 **Decision**: Semgrep OSS pinned to 1.182.1 with `p/python`, `p/dockerfile` and `p/github-actions` rule packs.
 **Trade-offs**: shallower dataflow analysis than CodeQL. CodeQL's default setup could be added later, but that is a repo setting that needs the owner.
 **Status**: Accepted
+
+## D-010: How traffic reaches the local cluster (2026-10-25)
+**Options**: ingress-nginx · Traefik or another ingress controller · Gateway API · NodePort with a kind port mapping
+**Constraints**: free; minimal moving parts; must stay maintained. Ingress NGINX was retired by Kubernetes SIG Network (announced 2025-11-11, best-effort maintenance ended March 2026), so new work should not build on it.
+**Decision**: no ingress controller. The chart exposes a NodePort (30080) and `k8s/kind-config.yaml` maps it to `127.0.0.1:8088`. Bound to loopback so the demo is never reachable from the network.
+**Trade-offs**: no host or path routing and no weighted traffic splitting at the edge. Argo Rollouts canaries in P7 will use replica-based weighting; revisit with Gateway API or Traefik only if request-weighted traffic splitting is needed.
+**Status**: Accepted
+
+## D-011: Host port 8088 (2026-10-25)
+**Options**: 8080 · 8088 · a random free port
+**Constraints**: 8080 is held by an unrelated process on the dev machine (bind fails with a permissions error); the port must be stable so docs and scripts can rely on it
+**Decision**: 8088, unreserved on this machine. If it clashes elsewhere, change `hostPort` in `k8s/kind-config.yaml` and the three references in `scripts/cluster.ps1` and the chart NOTES.
+**Trade-offs**: a non-default port to remember.
+**Status**: Accepted
