@@ -1,4 +1,5 @@
 {{- /* Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — AnalysisTemplate: the canary must keep a high success rate or the rollout aborts */ -}}
+{{- /* Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — No data is Inconclusive (pause), not Failed: a frozen node produced an empty sample and rolled back a healthy release */ -}}
 {{- if include "cicd-showcase.useRollout" . }}
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
@@ -14,8 +15,12 @@ spec:
       interval: {{ .Values.rollout.analysis.interval }}
       count: {{ .Values.rollout.analysis.count }}
       failureLimit: 0 # a single bad measurement aborts the rollout
-      # NaN (no traffic yet) compares false, so a canary that receives no requests also fails safe.
+      # Three outcomes, on purpose. A measured rate at or above the threshold passes, a measured rate
+      # below it fails. An empty or NaN result (no traffic, a scrape gap, a stalled node) satisfies
+      # neither condition, so the measurement is Inconclusive and the rollout pauses instead of
+      # rolling back or promoting without evidence.
       successCondition: len(result) > 0 && result[0] >= {{ .Values.rollout.analysis.minSuccessRate }}
+      failureCondition: len(result) > 0 && result[0] < {{ .Values.rollout.analysis.minSuccessRate }}
       provider:
         prometheus:
           address: {{ .Values.rollout.analysis.prometheusAddress }}
