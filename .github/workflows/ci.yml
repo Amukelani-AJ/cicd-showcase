@@ -2,6 +2,7 @@
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pinned every action to a commit SHA (bumped to current majors); Dependabot keeps them fresh
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added Trivy image scan and CycloneDX SBOM to the image job
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pass github.base_ref via env to fix a Semgrep shell-injection finding
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added k8s job: helm lint, kind cluster, chart install and endpoint check
 name: CI
 
 on:
@@ -93,3 +94,43 @@ jobs:
           format: cyclonedx-json
           output-file: sbom.cdx.json
           artifact-name: sbom-ci.cdx.json
+
+  k8s:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: python
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Lint the Helm chart
+        run: helm lint charts/cicd-showcase
+      - name: Build the image
+        run: docker build -t cicd-showcase:ci --build-arg APP_VERSION=ci --build-arg GIT_SHA="${GITHUB_SHA}" .
+      - name: Create the kind cluster
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        with:
+          cluster_name: cicd
+          config: k8s/kind-config.yaml
+      - name: Load the image and install the chart
+        run: |
+          kind load docker-image cicd-showcase:ci --name cicd
+          helm upgrade --install showcase charts/cicd-showcase \
+            --kube-context kind-cicd \
+            --set image.repository=cicd-showcase --set image.tag=ci --set image.pullPolicy=Never \
+            --wait --timeout 180s
+      - name: Verify the deployment answers on the mapped port
+        run: |
+          for i in $(seq 1 20); do
+            if body=$(curl -fsS http://127.0.0.1:8088/version); then
+              echo "$body"
+              echo "$body" | grep -q "${GITHUB_SHA}" && exit 0
+              echo "git_sha in /version does not match ${GITHUB_SHA}"; exit 1
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl --context kind-cicd get pods,svc -o wide || true
+          kubectl --context kind-cicd describe pods || true
+          kubectl --context kind-cicd logs -l app.kubernetes.io/name=cicd-showcase --tail=50 || true

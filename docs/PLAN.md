@@ -9,8 +9,8 @@ Status key: ⬜ Not started · 🚀 In Progress · ✅ Done
 | P0 | Governance bootstrap | ✅ Done 2026-10-25 |
 | P1 | Walking skeleton: service, tests, container, CI | ✅ Done 2026-10-25 |
 | P2 | Publish to GHCR | ✅ Done 2026-10-25 |
-| P3 | Security gates and supply chain | 🚀 In Progress |
-| P4 | Local Kubernetes with kind and Helm | ⬜ |
+| P3 | Security gates and supply chain | ✅ Done 2026-10-25 |
+| P4 | Local Kubernetes with kind and Helm | 🚀 In Progress |
 | P5 | GitOps with Argo CD | ⬜ |
 | P6 | Observability: Prometheus and Grafana | ⬜ |
 | P7 | Progressive delivery: canary with auto rollback | ⬜ |
@@ -53,16 +53,16 @@ Delivered together because each piece is meaningless without the others: a servi
 Push images to GHCR on `main` with `GITHUB_TOKEN`; tag with git SHA and `latest`. Needs a remote repo, which the owner must approve.
 
 ## P3: Security gates and supply chain
-**Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25
+**Status**: ✅ Done 2026-10-25 — Claude Sonnet 5.5. Gates green on PR #4; the published image's signature, SBOM attestation and provenance verify (`gh attestation verify` from outside CI).
 **Depends On**: P2
 **Complexity**: High
 Gitleaks, Semgrep, Trivy (fs and image), CycloneDX SBOM, keyless cosign signing and verification.
 
 ## P4: Local Kubernetes with kind and Helm
-**Status**: ⬜ Not started
+**Status**: 🚀 In Progress — Claude Sonnet 5.5, started 2026-10-25
 **Depends On**: P2
 **Complexity**: Medium
-Needs `kind` and `helm` installed. Helm chart for the service.
+Needs `kind` and `helm` installed (done via winget, kind v0.33.0 and Helm v4.3.1). Helm chart for the service, `scripts/cluster.ps1`, and a CI job that installs the chart on a fresh kind cluster. No ingress controller: NodePort mapped to `127.0.0.1:8088` (D-010, D-011).
 
 ## P5: GitOps with Argo CD
 **Status**: ⬜ Not started
