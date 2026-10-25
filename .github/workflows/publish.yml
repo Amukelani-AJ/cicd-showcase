@@ -1,5 +1,6 @@
 # Written by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Publish the image to GHCR on main and version tags, then smoke-test the pushed image
 # Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Pinned every action to a commit SHA (bumped to current majors); Dependabot keeps them fresh
+# Modified by Amukelani (Claude Sonnet 5.5) on 2026-10-25 — Added keyless cosign signing, SBOM attestation, build provenance and self-verification
 name: Publish
 
 on:
@@ -22,6 +23,8 @@ jobs:
     permissions:
       contents: read
       packages: write # push to GHCR with GITHUB_TOKEN
+      id-token: write # keyless signing (Sigstore) and provenance via OIDC
+      attestations: write # GitHub build provenance attestation
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -61,8 +64,10 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Smoke test the pushed image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          docker run -d --name published -p 8000:8000 "${IMAGE}@${{ steps.build.outputs.digest }}"
+          docker run -d --name published -p 8000:8000 "${IMAGE}@${DIGEST}"
           for i in $(seq 1 15); do
             if body=$(curl -fsS http://127.0.0.1:8000/version); then
               echo "$body"
@@ -74,14 +79,57 @@ jobs:
           docker logs published
           exit 1
 
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign the image (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Generate SBOM from the pushed image
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+          artifact-name: sbom-release.cdx.json
+
+      - name: Attach the SBOM as a signed attestation
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign attest --yes --type cyclonedx --predicate sbom.cdx.json "${IMAGE}@${DIGEST}"
+
+      - name: Build provenance attestation (SLSA)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Verify signature and SBOM attestation
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish.yml@${GITHUB_REF}"
+          issuer="https://token.actions.githubusercontent.com"
+          cosign verify "${IMAGE}@${DIGEST}" \
+            --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" >/dev/null
+          cosign verify-attestation "${IMAGE}@${DIGEST}" --type cyclonedx \
+            --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" >/dev/null
+          echo "signature and SBOM attestation verified for ${identity}"
+
       - name: Summary
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           {
             echo "### Published"
             echo "- Image: \`${IMAGE}\`"
-            echo "- Digest: \`${{ steps.build.outputs.digest }}\`"
+            echo "- Digest: \`${DIGEST}\`"
+            echo "- Signed (cosign keyless), SBOM attested (CycloneDX), provenance attested (SLSA)"
             echo "- Tags:"
             echo '```'
-            echo "${{ steps.meta.outputs.tags }}"
+            echo "${TAGS}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
